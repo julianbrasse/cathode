@@ -12,6 +12,7 @@ import android.os.Looper;
 import android.os.SystemClock;
 import android.util.DisplayMetrics;
 import android.view.Gravity;
+import android.view.InputDevice;
 import android.view.KeyEvent;
 import android.view.MotionEvent;
 import android.view.View;
@@ -24,6 +25,7 @@ import android.webkit.WebView;
 import android.webkit.WebViewClient;
 import android.widget.Button;
 import android.widget.EditText;
+import android.widget.FrameLayout;
 import android.widget.ImageButton;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
@@ -40,7 +42,9 @@ public class MainActivity extends Activity {
     private LinearLayout bookmarksPanel;
     private LinearLayout bookmarksRow1;
     private LinearLayout bookmarksRow2;
+    private FrameLayout searchContainer;
     private EditText urlEdit;
+    private ImageButton btnExit;
     private ImageButton btnClear;
     private ImageButton btnBack;
     private ImageButton btnForward;
@@ -49,6 +53,10 @@ public class MainActivity extends Activity {
     private Button btnBookmarks;
     private ImageView virtualCursor;
     private TextView hudToast;
+
+    private FrameLayout exitDialogContainer;
+    private Button btnExitConfirm;
+    private Button btnExitCancel;
 
     private float cursorX = 960f;
     private float cursorY = 540f;
@@ -120,7 +128,9 @@ public class MainActivity extends Activity {
         bookmarksPanel = findViewById(R.id.bookmarks_panel);
         bookmarksRow1 = findViewById(R.id.bookmarks_row1);
         bookmarksRow2 = findViewById(R.id.bookmarks_row2);
+        searchContainer = findViewById(R.id.search_container);
         urlEdit = findViewById(R.id.url_edit);
+        btnExit = findViewById(R.id.btn_exit);
         btnClear = findViewById(R.id.btn_clear);
         btnBack = findViewById(R.id.btn_back);
         btnForward = findViewById(R.id.btn_forward);
@@ -129,6 +139,10 @@ public class MainActivity extends Activity {
         btnBookmarks = findViewById(R.id.btn_bookmarks);
         virtualCursor = findViewById(R.id.virtual_cursor);
         hudToast = findViewById(R.id.hud_toast);
+
+        exitDialogContainer = findViewById(R.id.exit_dialog_container);
+        btnExitConfirm = findViewById(R.id.btn_exit_confirm);
+        btnExitCancel = findViewById(R.id.btn_exit_cancel);
 
         virtualCursor.setX(cursorX);
         virtualCursor.setY(cursorY);
@@ -203,6 +217,30 @@ public class MainActivity extends Activity {
     }
 
     private void setupBottomBar() {
+        btnExit.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                showExitDialog();
+            }
+        });
+
+        btnExit.setOnKeyListener(new View.OnKeyListener() {
+            @Override
+            public boolean onKey(View v, int keyCode, KeyEvent event) {
+                if (event.getAction() == KeyEvent.ACTION_DOWN) {
+                    if (keyCode == KeyEvent.KEYCODE_DPAD_RIGHT) {
+                        btnBack.requestFocus();
+                        return true;
+                    }
+                    if (keyCode == KeyEvent.KEYCODE_DPAD_UP || keyCode == KeyEvent.KEYCODE_DPAD_DOWN) {
+                        exitNavBarMode();
+                        return true;
+                    }
+                }
+                return false;
+            }
+        });
+
         btnBack.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
@@ -215,6 +253,10 @@ public class MainActivity extends Activity {
             @Override
             public boolean onKey(View v, int keyCode, KeyEvent event) {
                 if (event.getAction() == KeyEvent.ACTION_DOWN) {
+                    if (keyCode == KeyEvent.KEYCODE_DPAD_LEFT) {
+                        btnExit.requestFocus();
+                        return true;
+                    }
                     if (keyCode == KeyEvent.KEYCODE_DPAD_RIGHT) {
                         btnForward.requestFocus();
                         return true;
@@ -343,6 +385,19 @@ public class MainActivity extends Activity {
             }
         });
 
+        urlEdit.setOnFocusChangeListener(new View.OnFocusChangeListener() {
+            @Override
+            public void onFocusChange(View v, boolean hasFocus) {
+                if (searchContainer != null) {
+                    searchContainer.setSelected(hasFocus);
+                    searchContainer.setActivated(hasFocus);
+                }
+                if (hasFocus) {
+                    showBottomBar();
+                }
+            }
+        });
+
         urlEdit.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
@@ -420,6 +475,55 @@ public class MainActivity extends Activity {
                 return false;
             }
         });
+
+        btnExitConfirm.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                finishAffinity();
+                System.exit(0);
+            }
+        });
+
+        btnExitConfirm.setOnKeyListener(new View.OnKeyListener() {
+            @Override
+            public boolean onKey(View v, int keyCode, KeyEvent event) {
+                if (event.getAction() == KeyEvent.ACTION_DOWN) {
+                    if (keyCode == KeyEvent.KEYCODE_DPAD_RIGHT) {
+                        btnExitCancel.requestFocus();
+                        return true;
+                    }
+                    if (keyCode == KeyEvent.KEYCODE_BACK) {
+                        hideExitDialog();
+                        return true;
+                    }
+                }
+                return false;
+            }
+        });
+
+        btnExitCancel.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                hideExitDialog();
+            }
+        });
+
+        btnExitCancel.setOnKeyListener(new View.OnKeyListener() {
+            @Override
+            public boolean onKey(View v, int keyCode, KeyEvent event) {
+                if (event.getAction() == KeyEvent.ACTION_DOWN) {
+                    if (keyCode == KeyEvent.KEYCODE_DPAD_LEFT) {
+                        btnExitConfirm.requestFocus();
+                        return true;
+                    }
+                    if (keyCode == KeyEvent.KEYCODE_BACK) {
+                        hideExitDialog();
+                        return true;
+                    }
+                }
+                return false;
+            }
+        });
     }
 
     private void enterNavBarMode(View targetView) {
@@ -449,6 +553,10 @@ public class MainActivity extends Activity {
         isNavBarMode = true;
         virtualCursor.setVisibility(View.GONE);
         bookmarksPanel.setVisibility(View.GONE);
+        if (searchContainer != null) {
+            searchContainer.setSelected(true);
+            searchContainer.setActivated(true);
+        }
         glideBarToTop();
         urlEdit.requestFocus();
         urlEdit.selectAll();
@@ -458,8 +566,36 @@ public class MainActivity extends Activity {
 
     private void exitSearchMode() {
         hideKeyboard();
+        if (searchContainer != null) {
+            searchContainer.setSelected(false);
+            searchContainer.setActivated(false);
+        }
         isSearchingAtTop = false;
         exitNavBarMode();
+    }
+
+    private void showExitDialog() {
+        exitDialogContainer.setVisibility(View.VISIBLE);
+        exitDialogContainer.bringToFront();
+        virtualCursor.setVisibility(View.GONE);
+        handler.postDelayed(new Runnable() {
+            @Override
+            public void run() {
+                if (btnExitCancel != null) {
+                    btnExitCancel.requestFocus();
+                }
+            }
+        }, 150);
+    }
+
+    private void hideExitDialog() {
+        exitDialogContainer.setVisibility(View.GONE);
+        if (isNavBarMode) {
+            btnExit.requestFocus();
+        } else {
+            webView.requestFocus();
+            virtualCursor.setVisibility(View.VISIBLE);
+        }
     }
 
     private void glideBarToTop() {
@@ -492,8 +628,61 @@ public class MainActivity extends Activity {
     }
 
     private void scrollWeb(int dy) {
-        webView.scrollBy(0, dy);
-        webView.evaluateJavascript("window.scrollBy({top: " + dy + ", behavior: 'instant'});", null);
+        long now = SystemClock.uptimeMillis();
+
+        // 1. Hardware mouse wheel scroll generic motion event
+        try {
+            MotionEvent.PointerProperties[] props = new MotionEvent.PointerProperties[1];
+            props[0] = new MotionEvent.PointerProperties();
+            props[0].id = 0;
+            props[0].toolType = MotionEvent.TOOL_TYPE_MOUSE;
+
+            MotionEvent.PointerCoords[] coords = new MotionEvent.PointerCoords[1];
+            coords[0] = new MotionEvent.PointerCoords();
+            coords[0].x = cursorX;
+            coords[0].y = cursorY;
+            coords[0].setAxisValue(MotionEvent.AXIS_VSCROLL, dy < 0 ? 3.0f : -3.0f);
+
+            MotionEvent scrollEvent = MotionEvent.obtain(
+                now, now, MotionEvent.ACTION_SCROLL, 1, props, coords, 0, 0, 1.0f, 1.0f, 0, 0,
+                InputDevice.SOURCE_CLASS_POINTER, 0
+            );
+            webView.dispatchGenericMotionEvent(scrollEvent);
+            scrollEvent.recycle();
+        } catch (Exception ignored) {}
+
+        // 2. Simulated touch drag gesture on webView
+        try {
+            float midX = (cursorX > 100 && cursorX < screenWidth - 100) ? cursorX : screenWidth * 0.5f;
+            float startY = screenHeight * 0.55f;
+            float endY = startY - dy;
+            MotionEvent down = MotionEvent.obtain(now, now, MotionEvent.ACTION_DOWN, midX, startY, 0);
+            MotionEvent move = MotionEvent.obtain(now, now + 12, MotionEvent.ACTION_MOVE, midX, endY, 0);
+            MotionEvent up = MotionEvent.obtain(now, now + 24, MotionEvent.ACTION_UP, midX, endY, 0);
+            webView.dispatchTouchEvent(down);
+            webView.dispatchTouchEvent(move);
+            webView.dispatchTouchEvent(up);
+            down.recycle();
+            move.recycle();
+            up.recycle();
+        } catch (Exception ignored) {}
+
+        // 3. Multi-container JS scrolling across window, root, body, and all modal/dialog containers
+        String js = "(function() {" +
+            "  var dy = " + dy + ";" +
+            "  window.scrollBy({top: dy, behavior: 'instant'});" +
+            "  if (document.scrollingElement) document.scrollingElement.scrollTop += dy;" +
+            "  if (document.documentElement) document.documentElement.scrollTop += dy;" +
+            "  if (document.body) document.body.scrollTop += dy;" +
+            "  var all = document.querySelectorAll('div, main, section, dialog, article, aside');" +
+            "  for (var i = 0; i < all.length; i++) {" +
+            "    var el = all[i];" +
+            "    if (el.scrollHeight > el.clientHeight && el.clientHeight > 150) {" +
+            "      el.scrollTop += dy;" +
+            "    }" +
+            "  }" +
+            "})();";
+        webView.evaluateJavascript(js, null);
     }
 
     private void showBottomBar() {
@@ -513,6 +702,11 @@ public class MainActivity extends Activity {
         float hideDistance = dpToPx(120);
         bottomBar.animate().translationY(hideDistance).alpha(0f).setDuration(240).start();
         bookmarksPanel.setVisibility(View.GONE);
+    }
+
+    private void scheduleHideBottomBar(int delayMs) {
+        handler.removeCallbacks(hideBarRunnable);
+        handler.postDelayed(hideBarRunnable, delayMs);
     }
 
     private void showHudToast(String message) {
@@ -559,8 +753,8 @@ public class MainActivity extends Activity {
                 addBookmarkJson(defaults, "YouTube", "https://www.youtube.com");
                 addBookmarkJson(defaults, "Wikipedia", "https://www.wikipedia.org");
                 addBookmarkJson(defaults, "Reddit", "https://www.reddit.com");
-                addBookmarkJson(defaults, "Play Suisse", "https://www.playsuisse.ch");
-                addBookmarkJson(defaults, "Swisscom TV", "https://www.blueplus.ch");
+                addBookmarkJson(defaults, "GitHub", "https://github.com");
+                addBookmarkJson(defaults, "Archive", "https://archive.org");
                 prefs.edit().putString(PREF_BOOKMARKS, defaults.toString()).apply();
             } catch (Exception ignored) {}
         }
@@ -724,6 +918,37 @@ public class MainActivity extends Activity {
         int keyCode = event.getKeyCode();
         int action = event.getAction();
 
+        // 0. Exit Dialog handling
+        if (exitDialogContainer != null && exitDialogContainer.getVisibility() == View.VISIBLE) {
+            if (action == KeyEvent.ACTION_DOWN) {
+                if (keyCode == KeyEvent.KEYCODE_BACK) {
+                    hideExitDialog();
+                    return true;
+                }
+                if (keyCode == KeyEvent.KEYCODE_DPAD_LEFT) {
+                    btnExitConfirm.requestFocus();
+                    return true;
+                }
+                if (keyCode == KeyEvent.KEYCODE_DPAD_RIGHT) {
+                    btnExitCancel.requestFocus();
+                    return true;
+                }
+            }
+            return super.dispatchKeyEvent(event);
+        }
+
+        // Dedicated Page Scrolling Keys (Channel Up/Down, Page Up/Down, Media Rewind/FF)
+        if (action == KeyEvent.ACTION_DOWN) {
+            if (keyCode == KeyEvent.KEYCODE_PAGE_DOWN || keyCode == KeyEvent.KEYCODE_MEDIA_FAST_FORWARD || keyCode == KeyEvent.KEYCODE_CHANNEL_DOWN) {
+                scrollWeb(350);
+                return true;
+            }
+            if (keyCode == KeyEvent.KEYCODE_PAGE_UP || keyCode == KeyEvent.KEYCODE_MEDIA_REWIND || keyCode == KeyEvent.KEYCODE_CHANNEL_UP) {
+                scrollWeb(-350);
+                return true;
+            }
+        }
+
         // 1. Color Remote Shortcuts (Red = Bookmarks, Green = Reload, Blue = Search)
         if (action == KeyEvent.ACTION_DOWN) {
             if (keyCode == KeyEvent.KEYCODE_PROG_RED) {
@@ -752,6 +977,10 @@ public class MainActivity extends Activity {
         // 2. BACK key handling
         if (keyCode == KeyEvent.KEYCODE_BACK) {
             if (action == KeyEvent.ACTION_DOWN) {
+                if (exitDialogContainer != null && exitDialogContainer.getVisibility() == View.VISIBLE) {
+                    hideExitDialog();
+                    return true;
+                }
                 if (bookmarksPanel.getVisibility() == View.VISIBLE) {
                     closeBookmarksDrawer();
                     return true;
@@ -768,7 +997,7 @@ public class MainActivity extends Activity {
                     webView.goBack();
                     return true;
                 } else {
-                    enterNavBarMode(urlEdit);
+                    showExitDialog();
                     return true;
                 }
             }
@@ -788,6 +1017,17 @@ public class MainActivity extends Activity {
                     }
                     return true;
                 }
+
+                if (!isSearchingAtTop && urlEdit != null && urlEdit.hasFocus()) {
+                    if (keyCode == KeyEvent.KEYCODE_DPAD_LEFT) {
+                        btnRefresh.requestFocus();
+                        return true;
+                    }
+                    if (keyCode == KeyEvent.KEYCODE_DPAD_RIGHT) {
+                        btnClear.requestFocus();
+                        return true;
+                    }
+                }
             }
             return super.dispatchKeyEvent(event);
         }
@@ -799,39 +1039,49 @@ public class MainActivity extends Activity {
             keyCode == KeyEvent.KEYCODE_DPAD_RIGHT) {
 
             if (action == KeyEvent.ACTION_DOWN) {
-                float step = (event.getRepeatCount() > 2) ? 42f : 20f;
+                float step = (event.getRepeatCount() > 2) ? 44f : 22f;
+                float cursorSize = dpToPx(26);
+                float minX = dpToPx(8);
+                float maxX = screenWidth - cursorSize - dpToPx(8);
+                float minY = dpToPx(8);
+                float maxY = screenHeight - cursorSize - dpToPx(8);
+
                 switch (keyCode) {
                     case KeyEvent.KEYCODE_DPAD_UP:
-                        cursorY = Math.max(0, cursorY - step);
-                        // At very top edge: open nav bar
-                        if (cursorY <= 15) {
-                            enterNavBarMode(urlEdit);
-                            return true;
-                        }
+                        cursorY = Math.max(minY, cursorY - step);
                         // Upper boundary: scroll web page UP
-                        if (cursorY < 180) {
-                            scrollWeb(-130);
+                        if (cursorY < dpToPx(160)) {
+                            scrollWeb(-150);
                         }
                         break;
 
                     case KeyEvent.KEYCODE_DPAD_DOWN:
-                        cursorY = Math.min(screenHeight, cursorY + step);
-                        // Bottom boundary: scroll web page DOWN (does NOT open navbar)
-                        if (cursorY > screenHeight - 180) {
-                            scrollWeb(130);
+                        cursorY = Math.min(maxY, cursorY + step);
+                        // Bottom boundary: scroll web page DOWN
+                        if (cursorY > screenHeight - dpToPx(180)) {
+                            scrollWeb(150);
+                        }
+                        // Cursor position leads to showing nav bar when near bottom
+                        if (cursorY > screenHeight - dpToPx(95)) {
+                            showBottomBar();
                         }
                         break;
 
                     case KeyEvent.KEYCODE_DPAD_LEFT:
-                        cursorX = Math.max(0, cursorX - step);
+                        cursorX = Math.max(minX, cursorX - step);
                         break;
 
                     case KeyEvent.KEYCODE_DPAD_RIGHT:
-                        cursorX = Math.min(screenWidth, cursorX + step);
+                        cursorX = Math.min(maxX, cursorX + step);
                         break;
                 }
                 virtualCursor.setX(cursorX);
                 virtualCursor.setY(cursorY);
+
+                // Auto-hide bar if cursor moves back up into web content
+                if (cursorY < screenHeight - dpToPx(130) && isBarVisible && !isNavBarMode && !isSearchingAtTop) {
+                    scheduleHideBottomBar(2000);
+                }
             }
             return true;
         }
@@ -855,7 +1105,75 @@ public class MainActivity extends Activity {
             }
         }).start();
 
-        // If bottom bar or bookmarks was visible, hide them on click
+        // 0. If Exit Dialog is open, check button clicks
+        if (exitDialogContainer != null && exitDialogContainer.getVisibility() == View.VISIBLE) {
+            Rect confirmRect = new Rect();
+            btnExitConfirm.getGlobalVisibleRect(confirmRect);
+            if (confirmRect.contains((int) x, (int) y)) {
+                btnExitConfirm.performClick();
+                return;
+            }
+            Rect cancelRect = new Rect();
+            btnExitCancel.getGlobalVisibleRect(cancelRect);
+            if (cancelRect.contains((int) x, (int) y)) {
+                btnExitCancel.performClick();
+                return;
+            }
+            return;
+        }
+
+        // 1. If Bookmarks Panel is open, check bookmark clicks
+        if (bookmarksPanel.getVisibility() == View.VISIBLE) {
+            Rect panelRect = new Rect();
+            bookmarksPanel.getGlobalVisibleRect(panelRect);
+            if (panelRect.contains((int) x, (int) y)) {
+                for (int i = 0; i < bookmarksRow1.getChildCount(); i++) {
+                    View child = bookmarksRow1.getChildAt(i);
+                    Rect r = new Rect();
+                    child.getGlobalVisibleRect(r);
+                    if (r.contains((int) x, (int) y)) {
+                        child.performClick();
+                        return;
+                    }
+                }
+                for (int i = 0; i < bookmarksRow2.getChildCount(); i++) {
+                    View child = bookmarksRow2.getChildAt(i);
+                    Rect r = new Rect();
+                    child.getGlobalVisibleRect(r);
+                    if (r.contains((int) x, (int) y)) {
+                        child.performClick();
+                        return;
+                    }
+                }
+                return;
+            }
+        }
+
+        // 2. If Bottom Bar is visible, check button clicks
+        if (isBarVisible) {
+            Rect barRect = new Rect();
+            bottomBar.getGlobalVisibleRect(barRect);
+            if (barRect.contains((int) x, (int) y)) {
+                View[] buttons = new View[]{btnExit, btnBack, btnForward, btnRefresh, btnClear, btnGo, btnBookmarks};
+                for (View btn : buttons) {
+                    Rect r = new Rect();
+                    btn.getGlobalVisibleRect(r);
+                    if (r.contains((int) x, (int) y)) {
+                        btn.performClick();
+                        return;
+                    }
+                }
+                Rect urlRect = new Rect();
+                urlEdit.getGlobalVisibleRect(urlRect);
+                if (urlRect.contains((int) x, (int) y)) {
+                    enterSearchMode();
+                    return;
+                }
+                return;
+            }
+        }
+
+        // Otherwise hide bottom bar/bookmarks if open and click web page
         if (bookmarksPanel.getVisibility() == View.VISIBLE || isBarVisible) {
             bookmarksPanel.setVisibility(View.GONE);
             hideBottomBar();
