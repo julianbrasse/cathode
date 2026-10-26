@@ -1,0 +1,220 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/root_container"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/bg_dark"
+    android:focusable="true"
+    android:focusableInTouchMode="true"
+    android:descendantFocusability="beforeDescendants">
+
+    <!-- Primary Web View -->
+    <WebView
+        android:id="@+id/web_view"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:focusable="true"
+        android:focusableInTouchMode="true" />
+
+    <!-- Top Loading Progress Indicator -->
+    <ProgressBar
+        android:id="@+id/page_progress"
+        style="?android:attr/progressBarStyleHorizontal"
+        android:layout_width="match_parent"
+        android:layout_height="3dp"
+        android:layout_gravity="top"
+        android:visibility="gone" />
+
+    <!-- Bookmarks Drawer (2-Row Scalable Grid, Floats Directly Above Bottom Bar) -->
+    <LinearLayout
+        android:id="@+id/bookmarks_panel"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="bottom|center_horizontal"
+        android:layout_marginBottom="94dp"
+        android:background="@drawable/bar_background"
+        android:elevation="14dp"
+        android:orientation="vertical"
+        android:padding="12dp"
+        android:visibility="gone">
+
+        <HorizontalScrollView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:scrollbars="none">
+
+            <LinearLayout
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:orientation="vertical">
+
+                <!-- Row 1 -->
+                <LinearLayout
+                    android:id="@+id/bookmarks_row1"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal" />
+
+                <!-- Row 2 -->
+                <LinearLayout
+                    android:id="@+id/bookmarks_row2"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:orientation="horizontal" />
+            </LinearLayout>
+        </HorizontalScrollView>
+    </LinearLayout>
+
+    <!-- Sleek Bottom Navigation Bar (Centered, Auto-Hides on Inactivity) -->
+    <LinearLayout
+        android:id="@+id/bottom_bar"
+        android:layout_width="wrap_content"
+        android:layout_height="58dp"
+        android:layout_gravity="bottom|center_horizontal"
+        android:layout_marginBottom="24dp"
+        android:background="@drawable/bar_background"
+        android:elevation="12dp"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:paddingStart="12dp"
+        android:paddingTop="6dp"
+        android:paddingEnd="12dp"
+        android:paddingBottom="6dp">
+
+        <!-- Back Button (Completely Rounded Circle) -->
+        <ImageButton
+            android:id="@+id/btn_back"
+            android:layout_width="44dp"
+            android:layout_height="44dp"
+            android:background="@drawable/btn_circle_selector"
+            android:contentDescription="Back"
+            android:focusable="true"
+            android:scaleType="center"
+            android:src="@drawable/ic_nav_back" />
+
+        <!-- Forward Button (Completely Rounded Circle) -->
+        <ImageButton
+            android:id="@+id/btn_forward"
+            android:layout_width="44dp"
+            android:layout_height="44dp"
+            android:layout_marginStart="6dp"
+            android:background="@drawable/btn_circle_selector"
+            android:contentDescription="Forward"
+            android:focusable="true"
+            android:scaleType="center"
+            android:src="@drawable/ic_nav_forward" />
+
+        <!-- Refresh Button with Clean Vector SVG -->
+        <ImageButton
+            android:id="@+id/btn_refresh"
+            android:layout_width="44dp"
+            android:layout_height="44dp"
+            android:layout_marginStart="6dp"
+            android:background="@drawable/btn_circle_selector"
+            android:contentDescription="Reload"
+            android:focusable="true"
+            android:scaleType="center"
+            android:src="@drawable/ic_nav_refresh" />
+
+        <!-- Search / URL Input Container (Completely Rounded Pill with Embedded Clear X Button) -->
+        <FrameLayout
+            android:id="@+id/search_container"
+            android:layout_width="520dp"
+            android:layout_height="44dp"
+            android:layout_marginStart="8dp"
+            android:background="@drawable/url_edit_selector">
+
+            <EditText
+                android:id="@+id/url_edit"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:background="@android:color/transparent"
+                android:focusable="true"
+                android:gravity="center_vertical|start"
+                android:hint="@string/search_hint"
+                android:imeOptions="actionGo"
+                android:inputType="textUri"
+                android:paddingStart="16dp"
+                android:paddingEnd="42dp"
+                android:singleLine="true"
+                android:textColor="#FFFFFF"
+                android:textColorHint="#94A3B8"
+                android:textSize="14sp" />
+
+            <ImageButton
+                android:id="@+id/btn_clear"
+                android:layout_width="28dp"
+                android:layout_height="28dp"
+                android:layout_gravity="end|center_vertical"
+                android:layout_marginEnd="8dp"
+                android:background="@drawable/btn_clear_selector"
+                android:contentDescription="Clear"
+                android:focusable="true"
+                android:scaleType="center"
+                android:src="@drawable/ic_nav_clear" />
+        </FrameLayout>
+
+        <!-- Go / Navigate Button (Completely Rounded Circle) -->
+        <ImageButton
+            android:id="@+id/btn_go"
+            android:layout_width="44dp"
+            android:layout_height="44dp"
+            android:layout_marginStart="6dp"
+            android:background="@drawable/btn_circle_selector"
+            android:contentDescription="Go"
+            android:focusable="true"
+            android:scaleType="center"
+            android:src="@drawable/ic_nav_go" />
+
+        <!-- Bookmarks Button (Completely Rounded Pill with Red Shortcut Indicator) -->
+        <Button
+            android:id="@+id/btn_bookmarks"
+            android:layout_width="wrap_content"
+            android:layout_height="44dp"
+            android:layout_marginStart="8dp"
+            android:background="@drawable/btn_pill_selector"
+            android:drawableStart="@drawable/dot_red"
+            android:drawablePadding="8dp"
+            android:focusable="true"
+            android:gravity="center"
+            android:includeFontPadding="false"
+            android:paddingStart="16dp"
+            android:paddingEnd="16dp"
+            android:text="Bookmarks"
+            android:textColor="#FFFFFF"
+            android:textSize="13sp"
+            android:textStyle="bold" />
+    </LinearLayout>
+
+    <!-- Floating HUD Mode Indicator Toast -->
+    <TextView
+        android:id="@+id/hud_toast"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="top|center_horizontal"
+        android:layout_marginTop="36dp"
+        android:background="@drawable/hud_background"
+        android:elevation="20dp"
+        android:gravity="center"
+        android:includeFontPadding="false"
+        android:paddingStart="24dp"
+        android:paddingTop="10dp"
+        android:paddingEnd="24dp"
+        android:paddingBottom="10dp"
+        android:text="Notification"
+        android:textColor="#FFFFFF"
+        android:textSize="15sp"
+        android:textStyle="bold"
+        android:visibility="gone" />
+
+    <!-- Hardware-Accelerated Virtual Cursor View -->
+    <ImageView
+        android:id="@+id/virtual_cursor"
+        android:layout_width="26dp"
+        android:layout_height="26dp"
+        android:elevation="100dp"
+        android:src="@drawable/cursor_pointer"
+        android:visibility="visible" />
+
+</FrameLayout>

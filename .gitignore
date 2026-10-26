@@ -1,0 +1,6 @@
+build/
+bin/
+gen/
+*.keystore
+.DS_Store
+*.apk
