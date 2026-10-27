@@ -76,7 +76,9 @@ public class MainActivity extends Activity {
     private FrameLayout bookmarkDialogContainer;
     private TextView textBookmarkDialogTitle;
     private EditText editBookmarkTitle;
+    private ImageButton btnBookmarkClearTitle;
     private EditText editBookmarkUrl;
+    private ImageButton btnBookmarkClearUrl;
     private Button btnBookmarkDelete;
     private Button btnBookmarkCancel;
     private Button btnBookmarkSave;
@@ -190,10 +192,84 @@ public class MainActivity extends Activity {
         bookmarkDialogContainer = findViewById(R.id.bookmark_dialog_container);
         textBookmarkDialogTitle = findViewById(R.id.text_bookmark_dialog_title);
         editBookmarkTitle = findViewById(R.id.edit_bookmark_title);
+        btnBookmarkClearTitle = findViewById(R.id.btn_bookmark_clear_title);
         editBookmarkUrl = findViewById(R.id.edit_bookmark_url);
+        btnBookmarkClearUrl = findViewById(R.id.btn_bookmark_clear_url);
         btnBookmarkDelete = findViewById(R.id.btn_bookmark_delete);
         btnBookmarkCancel = findViewById(R.id.btn_bookmark_cancel);
         btnBookmarkSave = findViewById(R.id.btn_bookmark_save);
+
+        if (btnBookmarkClearTitle != null) {
+            btnBookmarkClearTitle.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    if (editBookmarkTitle != null) {
+                        editBookmarkTitle.setText("");
+                        editBookmarkTitle.requestFocus();
+                    }
+                }
+            });
+            btnBookmarkClearTitle.setOnKeyListener(new View.OnKeyListener() {
+                @Override
+                public boolean onKey(View v, int keyCode, KeyEvent event) {
+                    if (event.getAction() == KeyEvent.ACTION_DOWN) {
+                        if (keyCode == KeyEvent.KEYCODE_DPAD_LEFT) {
+                            if (editBookmarkTitle != null) editBookmarkTitle.requestFocus();
+                            return true;
+                        }
+                        if (keyCode == KeyEvent.KEYCODE_DPAD_DOWN) {
+                            if (btnBookmarkClearUrl != null) {
+                                btnBookmarkClearUrl.requestFocus();
+                            } else if (editBookmarkUrl != null) {
+                                editBookmarkUrl.requestFocus();
+                            }
+                            return true;
+                        }
+                    }
+                    return false;
+                }
+            });
+        }
+
+        if (btnBookmarkClearUrl != null) {
+            btnBookmarkClearUrl.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    if (editBookmarkUrl != null) {
+                        editBookmarkUrl.setText("");
+                        editBookmarkUrl.requestFocus();
+                    }
+                }
+            });
+            btnBookmarkClearUrl.setOnKeyListener(new View.OnKeyListener() {
+                @Override
+                public boolean onKey(View v, int keyCode, KeyEvent event) {
+                    if (event.getAction() == KeyEvent.ACTION_DOWN) {
+                        if (keyCode == KeyEvent.KEYCODE_DPAD_LEFT) {
+                            if (editBookmarkUrl != null) editBookmarkUrl.requestFocus();
+                            return true;
+                        }
+                        if (keyCode == KeyEvent.KEYCODE_DPAD_UP) {
+                            if (btnBookmarkClearTitle != null) {
+                                btnBookmarkClearTitle.requestFocus();
+                            } else if (editBookmarkTitle != null) {
+                                editBookmarkTitle.requestFocus();
+                            }
+                            return true;
+                        }
+                        if (keyCode == KeyEvent.KEYCODE_DPAD_DOWN) {
+                            if (btnBookmarkSave != null && btnBookmarkSave.getVisibility() == View.VISIBLE) {
+                                btnBookmarkSave.requestFocus();
+                            } else if (btnBookmarkCancel != null) {
+                                btnBookmarkCancel.requestFocus();
+                            }
+                            return true;
+                        }
+                    }
+                    return false;
+                }
+            });
+        }
 
         if (btnBookmarkCancel != null) {
             btnBookmarkCancel.setOnClickListener(new View.OnClickListener() {
@@ -225,6 +301,12 @@ public class MainActivity extends Activity {
                 @Override
                 public boolean onKey(View v, int keyCode, KeyEvent event) {
                     if (event.getAction() == KeyEvent.ACTION_DOWN) {
+                        if (keyCode == KeyEvent.KEYCODE_DPAD_RIGHT) {
+                            if (btnBookmarkClearTitle != null) {
+                                btnBookmarkClearTitle.requestFocus();
+                                return true;
+                            }
+                        }
                         if (keyCode == KeyEvent.KEYCODE_DPAD_DOWN) {
                             if (editBookmarkUrl != null) editBookmarkUrl.requestFocus();
                             return true;
@@ -239,12 +321,22 @@ public class MainActivity extends Activity {
                 @Override
                 public boolean onKey(View v, int keyCode, KeyEvent event) {
                     if (event.getAction() == KeyEvent.ACTION_DOWN) {
+                        if (keyCode == KeyEvent.KEYCODE_DPAD_RIGHT) {
+                            if (btnBookmarkClearUrl != null) {
+                                btnBookmarkClearUrl.requestFocus();
+                                return true;
+                            }
+                        }
                         if (keyCode == KeyEvent.KEYCODE_DPAD_UP) {
                             if (editBookmarkTitle != null) editBookmarkTitle.requestFocus();
                             return true;
                         }
                         if (keyCode == KeyEvent.KEYCODE_DPAD_DOWN) {
-                            if (btnBookmarkSave != null) btnBookmarkSave.requestFocus();
+                            if (btnBookmarkSave != null && btnBookmarkSave.getVisibility() == View.VISIBLE) {
+                                btnBookmarkSave.requestFocus();
+                            } else if (btnBookmarkCancel != null) {
+                                btnBookmarkCancel.requestFocus();
+                            }
                             return true;
                         }
                     }
@@ -356,6 +448,10 @@ public class MainActivity extends Activity {
         // Modern high-res Desktop Chrome User Agent for rich CSS layouts
         settings.setUserAgentString("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36");
 
+        webView.setVerticalScrollBarEnabled(true);
+        webView.setHorizontalScrollBarEnabled(true);
+        webView.setScrollBarStyle(View.SCROLLBARS_INSIDE_OVERLAY);
+
         webView.setWebViewClient(new WebViewClient() {
             @Override
             public void onPageStarted(WebView view, String url, android.graphics.Bitmap favicon) {
@@ -367,6 +463,7 @@ public class MainActivity extends Activity {
             public void onPageFinished(WebView view, String url) {
                 pageProgress.setVisibility(View.GONE);
                 urlEdit.setText(url);
+                injectCustomScrollbars(view);
                 if (!isNavBarMode && !isSearchingAtTop) {
                     hideBottomBar();
                 }
@@ -451,6 +548,9 @@ public class MainActivity extends Activity {
             @Override
             public void onProgressChanged(WebView view, int newProgress) {
                 pageProgress.setProgress(newProgress);
+                if (newProgress > 60) {
+                    injectCustomScrollbars(view);
+                }
                 if (newProgress == 100) {
                     pageProgress.setVisibility(View.GONE);
                 }
@@ -464,6 +564,23 @@ public class MainActivity extends Activity {
                 handleDownload(url, userAgent, contentDisposition, mimeType);
             }
         });
+    }
+
+    private void injectCustomScrollbars(WebView view) {
+        if (view == null) return;
+        String js = "(function() {" +
+            "  if (document.getElementById('cathode-blue-scrollbars')) return;" +
+            "  var s = document.createElement('style');" +
+            "  s.id = 'cathode-blue-scrollbars';" +
+            "  s.textContent = " +
+            "    '* { scrollbar-width: thin !important; scrollbar-color: #2979FF transparent !important; } ' +" +
+            "    '::-webkit-scrollbar { width: 6px !important; height: 6px !important; } ' +" +
+            "    '::-webkit-scrollbar-track { background: transparent !important; } ' +" +
+            "    '::-webkit-scrollbar-thumb { background: rgba(41, 121, 255, 0.75) !important; border-radius: 3px !important; } ' +" +
+            "    '::-webkit-scrollbar-thumb:hover { background: #2979FF !important; }';" +
+            "  (document.head || document.documentElement).appendChild(s);" +
+            "})();";
+        view.evaluateJavascript(js, null);
     }
 
     private void recreateWebView() {
@@ -1135,14 +1252,16 @@ public class MainActivity extends Activity {
         });
     }
 
-    private void scrollWeb(int dy) {
+    private void scrollWeb(int dx, int dy) {
         boolean insideModal = (activeModalRect != null && activeModalRect.contains(cursorX, cursorY));
 
         float targetX = cursorX;
         float targetY = cursorY;
 
         if (insideModal && activeModalRect != null) {
-            targetX = activeModalRect.centerX();
+            float safeLeft = Math.max(activeModalRect.left, dpToPx(20));
+            float safeRight = Math.min(activeModalRect.right, screenWidth - dpToPx(20));
+            targetX = (safeLeft + safeRight) / 2f;
             float safeTop = Math.max(activeModalRect.top, dpToPx(40));
             float safeBottom = (activeModalRect.bottom >= screenHeight - dpToPx(80)) ?
                     (screenHeight - dpToPx(72)) : activeModalRect.bottom;
@@ -1150,7 +1269,7 @@ public class MainActivity extends Activity {
         }
 
         // Single deterministic scroll driver: sub-container if present, otherwise single window.scrollBy
-        String js = "(function(cx, cy, dy) {" +
+        String js = "(function(cx, cy, dx, dy) {" +
             "  var dpr = window.devicePixelRatio || 1;" +
             "  var el = document.elementFromPoint(cx / dpr, cy / dpr);" +
             "  var target = null;" +
@@ -1158,26 +1277,36 @@ public class MainActivity extends Activity {
             "    var isDialog = (el.getAttribute('role') === 'dialog' || el.tagName === 'DIALOG' || el.classList.contains('modal') || el.classList.contains('dialog'));" +
             "    var isTextarea = (el.tagName === 'TEXTAREA');" +
             "    var s = window.getComputedStyle(el);" +
+            "    var ox = s.overflowX || s.overflow;" +
             "    var oy = s.overflowY || s.overflow;" +
+            "    var canScrollX = (ox === 'scroll' || ox === 'auto') && (el.scrollWidth > el.clientWidth + 20);" +
+            "    var canScrollY = (oy === 'scroll' || oy === 'auto') && (el.scrollHeight > el.clientHeight + 40);" +
             "    var r = el.getBoundingClientRect();" +
-            "    if (isTextarea || isDialog || (((oy === 'scroll' || oy === 'auto') && el.scrollHeight > el.clientHeight + 40) && r.height * dpr >= 160)) {" +
+            "    if (isTextarea || isDialog || (((canScrollX && dx !== 0) || (canScrollY && dy !== 0)) && r.height * dpr >= 120)) {" +
             "      target = el; break;" +
             "    }" +
             "    el = el.parentElement;" +
             "  }" +
             "  var scrolled = false;" +
             "  if (target) {" +
-            "    var oldTop = target.scrollTop;" +
-            "    target.scrollTop += dy;" +
-            "    if (Math.abs(target.scrollTop - oldTop) > 0.5) scrolled = true;" +
+            "    if (dy !== 0) {" +
+            "      var oldTop = target.scrollTop;" +
+            "      target.scrollTop += dy;" +
+            "      if (Math.abs(target.scrollTop - oldTop) > 0.5) scrolled = true;" +
+            "    }" +
+            "    if (dx !== 0) {" +
+            "      var oldLeft = target.scrollLeft;" +
+            "      target.scrollLeft += dx;" +
+            "      if (Math.abs(target.scrollLeft - oldLeft) > 0.5) scrolled = true;" +
+            "    }" +
             "  }" +
             "  if (!scrolled) {" +
-            "    window.scrollBy(0, dy);" +
+            "    window.scrollBy(dx, dy);" +
             "  }" +
             "  var canUp = target ? (target.scrollTop > 4) : (window.scrollY > 4);" +
             "  var canDown = target ? (target.scrollTop + target.clientHeight < target.scrollHeight - 8) : (window.innerHeight + window.scrollY < document.documentElement.scrollHeight - 8);" +
             "  return JSON.stringify({canUp: canUp, canDown: canDown});" +
-            "})(" + targetX + ", " + targetY + ", " + dy + ");";
+            "})(" + targetX + ", " + targetY + ", " + dx + ", " + dy + ");";
 
         webView.evaluateJavascript(js, new ValueCallback<String>() {
             @Override
@@ -1516,11 +1645,11 @@ public class MainActivity extends Activity {
         // Dedicated Page Scrolling Keys (Channel Up/Down, Page Up/Down, Media Rewind/FF)
         if (action == KeyEvent.ACTION_DOWN) {
             if (keyCode == KeyEvent.KEYCODE_PAGE_DOWN || keyCode == KeyEvent.KEYCODE_MEDIA_FAST_FORWARD || keyCode == KeyEvent.KEYCODE_CHANNEL_DOWN) {
-                scrollWeb(350);
+                scrollWeb(0, 350);
                 return true;
             }
             if (keyCode == KeyEvent.KEYCODE_PAGE_UP || keyCode == KeyEvent.KEYCODE_MEDIA_REWIND || keyCode == KeyEvent.KEYCODE_CHANNEL_UP) {
-                scrollWeb(-350);
+                scrollWeb(0, -350);
                 return true;
             }
         }
@@ -1649,17 +1778,23 @@ public class MainActivity extends Activity {
 
                 // Check if cursor is currently within an active modal / popup / scrollable container
                 final boolean insideModal;
+                final float effectiveMinX;
+                final float effectiveMaxX;
                 final float effectiveMinY;
                 final float effectiveMaxY;
 
                 if (activeModalRect != null && activeModalRect.contains(cursorX, cursorY)) {
                     insideModal = true;
+                    effectiveMinX = Math.max(minX, activeModalRect.left + dpToPx(6));
+                    effectiveMaxX = Math.min(maxX, activeModalRect.right - dpToPx(6));
                     effectiveMinY = Math.max(minY, activeModalRect.top + dpToPx(6));
                     float modalBottom = (activeModalRect.bottom >= screenHeight - dpToPx(80)) ?
                             (screenHeight - dpToPx(72)) : (activeModalRect.bottom - dpToPx(8));
                     effectiveMaxY = Math.min(maxY, modalBottom);
                 } else {
                     insideModal = false;
+                    effectiveMinX = minX;
+                    effectiveMaxX = maxX;
                     effectiveMinY = minY;
                     effectiveMaxY = maxY;
                 }
@@ -1684,7 +1819,7 @@ public class MainActivity extends Activity {
                                 updateCursorIcon(R.drawable.cursor_scroll_up);
                             } else {
                                 updateCursorIcon(R.drawable.cursor_scroll_up);
-                                scrollWeb(insideModal ? -75 : -100);
+                                scrollWeb(0, insideModal ? -75 : -100);
                             }
                         } else {
                             edgeScrollTicks = 0;
@@ -1713,7 +1848,7 @@ public class MainActivity extends Activity {
                                 updateCursorIcon(R.drawable.cursor_scroll_down);
                             } else {
                                 updateCursorIcon(R.drawable.cursor_scroll_down);
-                                scrollWeb(insideModal ? 75 : 100);
+                                scrollWeb(0, insideModal ? 75 : 100);
                             }
                         } else {
                             edgeScrollTicks = 0;
@@ -1724,23 +1859,53 @@ public class MainActivity extends Activity {
                         break;
 
                     case KeyEvent.KEYCODE_DPAD_LEFT:
-                        edgeScrollTicks = 0;
-                        cursorX = Math.max(minX, cursorX - step);
-                        if (insideModal && activeModalRect != null && cursorX < activeModalRect.left) {
-                            activeModalRect = null;
-                            isInsideIframe = false;
+                        if (cursorX <= effectiveMinX + 4f) {
+                            if (insideModal && edgeScrollTicks >= 2) {
+                                activeModalRect = null;
+                                isInsideIframe = false;
+                                cursorX = Math.max(minX, cursorX - step);
+                                updateCursorIcon(R.drawable.cursor_pointer);
+                                edgeScrollTicks = 0;
+                                break;
+                            }
+                            edgeScrollTicks++;
+                            if (edgeScrollTicks > 1) {
+                                scrollWeb(insideModal ? -75 : -100, 0);
+                            }
+                        } else {
+                            edgeScrollTicks = 0;
+                            cursorX = Math.max(effectiveMinX, cursorX - step);
+                            if (insideModal && activeModalRect != null && cursorX < activeModalRect.left) {
+                                activeModalRect = null;
+                                isInsideIframe = false;
+                            }
+                            updateCursorIcon(R.drawable.cursor_pointer);
                         }
-                        updateCursorIcon(R.drawable.cursor_pointer);
                         break;
 
                     case KeyEvent.KEYCODE_DPAD_RIGHT:
-                        edgeScrollTicks = 0;
-                        cursorX = Math.min(maxX, cursorX + step);
-                        if (insideModal && activeModalRect != null && cursorX > activeModalRect.right) {
-                            activeModalRect = null;
-                            isInsideIframe = false;
+                        if (cursorX >= effectiveMaxX - 4f) {
+                            if (insideModal && edgeScrollTicks >= 2) {
+                                activeModalRect = null;
+                                isInsideIframe = false;
+                                cursorX = Math.min(maxX, cursorX + step);
+                                updateCursorIcon(R.drawable.cursor_pointer);
+                                edgeScrollTicks = 0;
+                                break;
+                            }
+                            edgeScrollTicks++;
+                            if (edgeScrollTicks > 1) {
+                                scrollWeb(insideModal ? 75 : 100, 0);
+                            }
+                        } else {
+                            edgeScrollTicks = 0;
+                            cursorX = Math.min(effectiveMaxX, cursorX + step);
+                            if (insideModal && activeModalRect != null && cursorX > activeModalRect.right) {
+                                activeModalRect = null;
+                                isInsideIframe = false;
+                            }
+                            updateCursorIcon(R.drawable.cursor_pointer);
                         }
-                        updateCursorIcon(R.drawable.cursor_pointer);
                         break;
                 }
                 virtualCursor.setX(cursorX);

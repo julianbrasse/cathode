@@ -15,21 +15,9 @@ An ultra-lean, bloat-free web browser built specifically for Android TV and Goog
 - **Intelligent Modal & Popup Edge Scrolling**: When the cursor enters any floating popup, modal dialog, dropdown menu, or iframe (such as Google's 9-dot app drawer, cookie consent sheets, or nested containers), edge scrolling dynamically binds to the boundaries of that modal. Pushing against the top or bottom of the modal smoothly scrolls the container content without requiring the cursor to travel to the distant TV screen edges.
 - **Two-Stage Scroll Detent & Unified Glass Reticles**: Reaching any scrollable edge keeps the standard circular reticle intact. The cursor only morphs into the directional scroll reticle (UP / DOWN) on the first extra push in that direction, featuring matching 3dp drop shadows and glass ring styling that ensures crisp readability over white, black, or colorful backgrounds.
 - **Fluid 60fps Smooth Scrolling**: Chromium GPU-composited smooth scrolling (`behavior: 'smooth'`) for pages and containers, paired with targeted touch gestures for isolated cross-origin iframes.
-- **Material Blue Page Progress**: Clean Electric Blue (`#2979FF`) loading bar at the top of the screen instead of OEM default yellow.
-- **Three-Layer Universal Scrolling**:
-  - **Layer 1 (Native Generic Motion)**: Hardware mouse-wheel `ACTION_SCROLL` events (`AXIS_VSCROLL`) routed directly to the element under the cursor.
-  - **Layer 2 (Targeted Touch Flick)**: Physics-tuned touch gestures at `(cursorX, cursorY)` that seamlessly scroll `<iframe>` widgets and cross-origin popups where DOM access is restricted.
-  - **Layer 3 (Universal DOM)**: Deep multi-container scroll covering `window` and any scrollable container with overflow.
-- **Dedicated App Exit Flow**: A clear Exit button `[->]` on the far left of the bottom bar with an Android TV confirmation dialog (`[Cancel]` / `[Exit]`) to prevent accidental quits.
-- **Direct D-Pad Tabbing**: Full focusable support for TV remotes with high-contrast outlines (2.5dp pure white border on the URL input when focused).
-- **Instant Search with Clear Button**: One-click `[ X ]` button embedded directly in the search bar to clear input or start a new search.
-- **Color Remote Shortcuts**:
-  - **Red**: Toggle Bookmarks Drawer
-  - **Yellow**: Add / Save Current Page to Bookmarks
-  - **Green**: Reload Page
-  - **Blue**: Quick Search Mode
-  - **Menu / Window**: Toggle Navigation Bar / Edit Focused Bookmark
-- **Bookmark Management**: Long-press OK on any bookmark chip (or press Menu/Window) to edit title, URL, or delete. Focused directly upon opening drawer.
+- **Material Blue Page Progress & Clean Scrollbars**: Clean Electric Blue (`#2979FF`) loading bar paired with sleek 6px rounded Electric Blue scrollbars across both native Android views and injected Chromium DOM/WebKit elements (including wide pages, modals, iframes, and code blocks).
+- **Two-Axis Edge Scrolling (Vertical & Horizontal)**: Pushing the virtual cursor against screen or modal boundaries scrolls in all 4 directions (UP, DOWN, LEFT, RIGHT), ensuring wide desktop layouts, data tables, and horizontal galleries are never cut off.
+- **Bookmark Management & Clear Buttons**: Long-press OK on any bookmark chip (or press Menu/Window) to edit title, URL, or delete. Embedded `[ X ]` clear buttons in Name and URL inputs allow instant clearing via TV remote. Focused directly upon opening drawer.
 
 ---
 
