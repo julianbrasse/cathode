@@ -12,7 +12,7 @@ An ultra-lean, bloat-free web browser built specifically for Android TV and Goog
 - **Back-to-Navbar Architecture**: Pressing `BACK` while browsing brings up the navigation bar instead of abruptly quitting the app.
 - **History Navigation**: Pressing `BACK` while on the navigation bar seamlessly navigates back in browser history (`webView.goBack()`).
 - **One-Touch Bar Dismissal**: Pressing D-Pad `UP` or `DOWN` on the navigation bar exits directly back to web browsing.
-- **Dynamic Edge Scroll Reticle**: Moving the virtual cursor across the screen never interferes with the UI. When pushed against the very top or bottom edge of the display, the cursor dynamically morphs into an upward (`▲`) or downward (`▼`) scroll reticle while smoothly scrolling the page.
+- **Dynamic Edge Scroll with Detent**: Moving the virtual cursor across the screen never interferes with the UI. When the cursor lands at the screen perimeter, it morphs into an upward (`▲`) or downward (`▼`) scroll reticle without prematurely shifting content. An additional click (or holding the D-Pad) initiates smooth, gentle page scrolling in controlled 75px increments.
 - **Two-Layer Universal Scrolling**:
   - **Layer 1 (Native)**: Hardware mouse-wheel `ACTION_SCROLL` events (`AXIS_VSCROLL`).
   - **Layer 2 (Universal DOM)**: Deep container scrolling that handles `window`, `document.scrollingElement`, `document.body`, and nested scrollable modals (e.g. cookie / GDPR consent overlays).

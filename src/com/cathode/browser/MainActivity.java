@@ -59,6 +59,7 @@ public class MainActivity extends Activity {
     private Button btnExitCancel;
 
     private int currentCursorResId = R.drawable.cursor_pointer;
+    private int edgeScrollTicks = 0;
 
     private float cursorX = 960f;
     private float cursorY = 540f;
@@ -579,6 +580,7 @@ public class MainActivity extends Activity {
         if (bottomBar.hasFocus()) bottomBar.clearFocus();
         webView.requestFocus();
         virtualCursor.setVisibility(View.VISIBLE);
+        edgeScrollTicks = 0;
         updateCursorIcon(R.drawable.cursor_pointer);
     }
 
@@ -647,7 +649,7 @@ public class MainActivity extends Activity {
     private void scrollWeb(int dy) {
         long now = SystemClock.uptimeMillis();
 
-        // Layer 1: Hardware-accelerated mouse wheel generic motion event
+        // Layer 1: Hardware-accelerated mouse wheel generic motion event (1 discrete tick)
         try {
             MotionEvent.PointerProperties[] props = new MotionEvent.PointerProperties[1];
             props[0] = new MotionEvent.PointerProperties();
@@ -658,7 +660,7 @@ public class MainActivity extends Activity {
             coords[0] = new MotionEvent.PointerCoords();
             coords[0].x = cursorX;
             coords[0].y = cursorY;
-            coords[0].setAxisValue(MotionEvent.AXIS_VSCROLL, dy < 0 ? 3.0f : -3.0f);
+            coords[0].setAxisValue(MotionEvent.AXIS_VSCROLL, dy < 0 ? 1.0f : -1.0f);
 
             MotionEvent scrollEvent = MotionEvent.obtain(
                 now, now, MotionEvent.ACTION_SCROLL, 1, props, coords, 0, 0, 1.0f, 1.0f, 0, 0,
@@ -668,19 +670,18 @@ public class MainActivity extends Activity {
             scrollEvent.recycle();
         } catch (Exception ignored) {}
 
-        // Layer 2: Universal DOM scroll covering window, document.scrollingElement, documentElement, body,
-        // and any scrollable container/modal/dialog with overflow
+        // Layer 2: Universal DOM scroll covering window and any scrollable container/modal/dialog with overflow
         String js = "(function() {" +
             "  var dy = " + dy + ";" +
             "  window.scrollBy({top: dy, behavior: 'instant'});" +
-            "  if (document.scrollingElement) document.scrollingElement.scrollTop += dy;" +
-            "  if (document.documentElement) document.documentElement.scrollTop += dy;" +
-            "  if (document.body) document.body.scrollTop += dy;" +
             "  var all = document.querySelectorAll('div, main, section, dialog, article, aside');" +
             "  for (var i = 0; i < all.length; i++) {" +
             "    var el = all[i];" +
-            "    if (el.scrollHeight > el.clientHeight && el.clientHeight > 150) {" +
-            "      el.scrollTop += dy;" +
+            "    if (el.scrollHeight > el.clientHeight + 20 && el.clientHeight > 150) {" +
+            "      var s = window.getComputedStyle(el);" +
+            "      if (s.overflowY === 'scroll' || s.overflowY === 'auto' || s.overflow === 'scroll' || s.overflow === 'auto') {" +
+            "        el.scrollTop += dy;" +
+            "      }" +
             "    }" +
             "  }" +
             "})();";
@@ -1053,32 +1054,50 @@ public class MainActivity extends Activity {
                 switch (keyCode) {
                     case KeyEvent.KEYCODE_DPAD_UP:
                         if (cursorY <= minY + 4f) {
-                            // Only scroll when pushed against the very top edge of the TV
-                            scrollWeb(-180);
+                            edgeScrollTicks++;
                             updateCursorIcon(R.drawable.cursor_scroll_up);
+                            if (edgeScrollTicks >= 2) {
+                                // 1-click detent passed: scroll upwards with gentle, controlled step
+                                scrollWeb(-75);
+                            }
                         } else {
+                            edgeScrollTicks = 0;
                             cursorY = Math.max(minY, cursorY - step);
-                            updateCursorIcon(R.drawable.cursor_pointer);
+                            if (cursorY <= minY + 4f) {
+                                updateCursorIcon(R.drawable.cursor_scroll_up);
+                            } else {
+                                updateCursorIcon(R.drawable.cursor_pointer);
+                            }
                         }
                         break;
 
                     case KeyEvent.KEYCODE_DPAD_DOWN:
                         if (cursorY >= maxY - 4f) {
-                            // Only scroll when pushed against the very bottom edge of the TV
-                            scrollWeb(180);
+                            edgeScrollTicks++;
                             updateCursorIcon(R.drawable.cursor_scroll_down);
+                            if (edgeScrollTicks >= 2) {
+                                // 1-click detent passed: scroll downwards with gentle, controlled step
+                                scrollWeb(75);
+                            }
                         } else {
+                            edgeScrollTicks = 0;
                             cursorY = Math.min(maxY, cursorY + step);
-                            updateCursorIcon(R.drawable.cursor_pointer);
+                            if (cursorY >= maxY - 4f) {
+                                updateCursorIcon(R.drawable.cursor_scroll_down);
+                            } else {
+                                updateCursorIcon(R.drawable.cursor_pointer);
+                            }
                         }
                         break;
 
                     case KeyEvent.KEYCODE_DPAD_LEFT:
+                        edgeScrollTicks = 0;
                         cursorX = Math.max(minX, cursorX - step);
                         updateCursorIcon(R.drawable.cursor_pointer);
                         break;
 
                     case KeyEvent.KEYCODE_DPAD_RIGHT:
+                        edgeScrollTicks = 0;
                         cursorX = Math.min(maxX, cursorX + step);
                         updateCursorIcon(R.drawable.cursor_pointer);
                         break;
