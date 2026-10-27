@@ -76,6 +76,7 @@ public class MainActivity extends Activity {
     private static final float CURSOR_HALF_PX = 30f;
     private static final float CURSOR_STEP_PX = 20f;
     private static final float CURSOR_REPEAT_STEP_PX = 40f;
+    private static final float CURSOR_MARGIN_EDGE_PX = 40f;
 
     // Diagnostics Debug Layer
     private boolean isDebugVisible = false;
@@ -366,6 +367,11 @@ public class MainActivity extends Activity {
                 pageLoadStartTime = System.currentTimeMillis();
                 pageProgress.setVisibility(View.VISIBLE);
                 urlEdit.setText(url);
+                containerCanScrollUp = false;
+                containerCanScrollDown = true;
+                if (webView != null && webView.getScrollY() != 0) {
+                    webView.scrollTo(webView.getScrollX(), 0);
+                }
             }
 
             @Override
@@ -375,6 +381,8 @@ public class MainActivity extends Activity {
                 urlEdit.setText(url);
                 injectCustomScrollbars(view);
                 injectAutoFit(view);
+                containerCanScrollUp = false;
+                containerCanScrollDown = true;
                 if (isDebugVisible) {
                     updateDebugHud();
                 }
@@ -1154,12 +1162,14 @@ public class MainActivity extends Activity {
             "      var canUp = isIframe ? true : (el.scrollTop > 4);" +
             "      var canDown = isIframe ? true : (el.scrollTop + el.clientHeight < el.scrollHeight - 8);" +
             "      if (rh < (window.innerHeight * dpr - 40) || rw < (window.innerWidth * dpr - 40)) {" +
-            "        return JSON.stringify({top: top, bottom: bottom, left: left, right: right, canUp: canUp, canDown: canDown, isIframe: isIframe});" +
+            "        return JSON.stringify({isModal: true, top: top, bottom: bottom, left: left, right: right, canUp: canUp, canDown: canDown, isIframe: isIframe});" +
             "      }" +
             "    }" +
             "    el = el.parentElement;" +
             "  }" +
-            "  return '';" +
+            "  var curY = window.scrollY || window.pageYOffset || (document.scrollingElement ? document.scrollingElement.scrollTop : 0) || 0;" +
+            "  var maxH = Math.max(document.documentElement ? document.documentElement.scrollHeight : 0, document.body ? document.body.scrollHeight : 0, document.scrollingElement ? document.scrollingElement.scrollHeight : 0);" +
+            "  return JSON.stringify({isModal: false, canUp: (curY > 4), canDown: (window.innerHeight + curY < maxH - 8)});" +
             "})(" + x + ", " + y + ");";
 
         webView.evaluateJavascript(js, new ValueCallback<String>() {
@@ -1168,8 +1178,6 @@ public class MainActivity extends Activity {
                 if (value == null || value.equals("null") || value.equals("\"\"") || value.isEmpty()) {
                     if (activeModalRect != null && !activeModalRect.contains(x, y)) {
                         activeModalRect = null;
-                        containerCanScrollUp = true;
-                        containerCanScrollDown = true;
                         isInsideIframe = false;
                         if (isDebugVisible && debugGridView != null) debugGridView.setCursorPos(cursorX, cursorY, null);
                     }
@@ -1181,20 +1189,29 @@ public class MainActivity extends Activity {
                         clean = clean.substring(1, clean.length() - 1).replace("\\\"", "\"");
                     }
                     JSONObject obj = new JSONObject(clean);
-                    float top = (float) obj.getDouble("top");
-                    float bottom = (float) obj.getDouble("bottom");
-                    float left = (float) obj.getDouble("left");
-                    float right = (float) obj.getDouble("right");
-                    activeModalRect = new RectF(left, top, right, bottom);
-                    containerCanScrollUp = obj.optBoolean("canUp", true);
-                    containerCanScrollDown = obj.optBoolean("canDown", true);
-                    isInsideIframe = obj.optBoolean("isIframe", false);
-                    if (isDebugVisible && debugGridView != null) debugGridView.setCursorPos(cursorX, cursorY, activeModalRect);
+                    boolean isModal = obj.optBoolean("isModal", false);
+                    if (isModal) {
+                        float top = (float) obj.getDouble("top");
+                        float bottom = (float) obj.getDouble("bottom");
+                        float left = (float) obj.getDouble("left");
+                        float right = (float) obj.getDouble("right");
+                        activeModalRect = new RectF(left, top, right, bottom);
+                        containerCanScrollUp = obj.optBoolean("canUp", true);
+                        containerCanScrollDown = obj.optBoolean("canDown", true);
+                        isInsideIframe = obj.optBoolean("isIframe", false);
+                        if (isDebugVisible && debugGridView != null) debugGridView.setCursorPos(cursorX, cursorY, activeModalRect);
+                    } else {
+                        if (activeModalRect != null && !activeModalRect.contains(x, y)) {
+                            activeModalRect = null;
+                            isInsideIframe = false;
+                        }
+                        containerCanScrollUp = obj.optBoolean("canUp", false);
+                        containerCanScrollDown = obj.optBoolean("canDown", true);
+                        if (isDebugVisible && debugGridView != null) debugGridView.setCursorPos(cursorX, cursorY, activeModalRect);
+                    }
                 } catch (Exception e) {
                     if (activeModalRect != null && !activeModalRect.contains(x, y)) {
                         activeModalRect = null;
-                        containerCanScrollUp = true;
-                        containerCanScrollDown = true;
                         isInsideIframe = false;
                         if (isDebugVisible && debugGridView != null) debugGridView.setCursorPos(cursorX, cursorY, null);
                     }
@@ -1204,6 +1221,13 @@ public class MainActivity extends Activity {
     }
 
     private void scrollWeb(final int dx, final int dy) {
+        if (dy < 0 && !containerCanScrollUp) {
+            return;
+        }
+        if (dy > 0 && !containerCanScrollDown) {
+            return;
+        }
+
         boolean insideModal = (activeModalRect != null && activeModalRect.contains(cursorX, cursorY));
 
         float targetX = cursorX;
@@ -1239,42 +1263,52 @@ public class MainActivity extends Activity {
             "    el = el.parentElement;" +
             "  }" +
             "  var scrolled = false;" +
+            "  var atEdge = false;" +
             "  if (target) {" +
-            "    if (dy !== 0) {" +
-            "      var oldTop = target.scrollTop;" +
+            "    var curTargetTop = target.scrollTop;" +
+            "    if (dy < 0 && curTargetTop <= 0) atEdge = true;" +
+            "    if (dy > 0 && curTargetTop + target.clientHeight >= target.scrollHeight - 1) atEdge = true;" +
+            "    if (dy !== 0 && !atEdge) {" +
             "      target.scrollTop += dy;" +
-            "      if (Math.abs(target.scrollTop - oldTop) > 0.5) scrolled = true;" +
+            "      if (Math.abs(target.scrollTop - curTargetTop) > 0.5) scrolled = true;" +
             "    }" +
             "    if (dx !== 0) {" +
             "      var oldLeft = target.scrollLeft;" +
             "      target.scrollLeft += dx;" +
             "      if (Math.abs(target.scrollLeft - oldLeft) > 0.5) scrolled = true;" +
             "    }" +
-            "  }" +
-            "  if (!scrolled) {" +
-            "    var oldWinX = window.scrollX || window.pageXOffset || 0;" +
-            "    var oldWinY = window.scrollY || window.pageYOffset || 0;" +
-            "    window.scrollBy(dx, dy);" +
-            "    var newWinX = window.scrollX || window.pageXOffset || 0;" +
-            "    var newWinY = window.scrollY || window.pageYOffset || 0;" +
-            "    if (dx !== 0 && newWinX === oldWinX) {" +
-            "      if (document.scrollingElement) document.scrollingElement.scrollLeft += dx;" +
-            "      else if (document.documentElement) document.documentElement.scrollLeft += dx;" +
-            "      else if (document.body) document.body.scrollLeft += dx;" +
+            "  } else {" +
+            "    var curWinY = window.scrollY || window.pageYOffset || (document.scrollingElement ? document.scrollingElement.scrollTop : 0) || (document.documentElement ? document.documentElement.scrollTop : 0) || (document.body ? document.body.scrollTop : 0);" +
+            "    var maxScrollY = Math.max(document.documentElement ? document.documentElement.scrollHeight : 0, document.body ? document.body.scrollHeight : 0, document.scrollingElement ? document.scrollingElement.scrollHeight : 0);" +
+            "    if (dy < 0 && curWinY <= 0) atEdge = true;" +
+            "    if (dy > 0 && window.innerHeight + curWinY >= maxScrollY - 2) atEdge = true;" +
+            "    if (!atEdge) {" +
+            "      var oldWinX = window.scrollX || window.pageXOffset || 0;" +
+            "      var oldWinY = curWinY;" +
+            "      window.scrollBy(dx, dy);" +
+            "      var newWinX = window.scrollX || window.pageXOffset || 0;" +
+            "      var newWinY = window.scrollY || window.pageYOffset || (document.scrollingElement ? document.scrollingElement.scrollTop : 0) || (document.documentElement ? document.documentElement.scrollTop : 0) || (document.body ? document.body.scrollTop : 0);" +
+            "      if (dx !== 0 && newWinX === oldWinX) {" +
+            "        if (document.scrollingElement) document.scrollingElement.scrollLeft += dx;" +
+            "        else if (document.documentElement) document.documentElement.scrollLeft += dx;" +
+            "        else if (document.body) document.body.scrollLeft += dx;" +
+            "      }" +
+            "      if (dy !== 0 && newWinY === oldWinY) {" +
+            "        if (document.scrollingElement) document.scrollingElement.scrollTop += dy;" +
+            "        else if (document.documentElement) document.documentElement.scrollTop += dy;" +
+            "        else if (document.body) document.body.scrollTop += dy;" +
+            "      }" +
+            "      var finalWinX = window.scrollX || window.pageXOffset || (document.scrollingElement ? document.scrollingElement.scrollLeft : 0);" +
+            "      var finalWinY = window.scrollY || window.pageYOffset || (document.scrollingElement ? document.scrollingElement.scrollTop : 0);" +
+            "      if (dx !== 0 && Math.abs(finalWinX - oldWinX) > 0.5) scrolled = true;" +
+            "      if (dy !== 0 && Math.abs(finalWinY - oldWinY) > 0.5) scrolled = true;" +
             "    }" +
-            "    if (dy !== 0 && newWinY === oldWinY) {" +
-            "      if (document.scrollingElement) document.scrollingElement.scrollTop += dy;" +
-            "      else if (document.documentElement) document.documentElement.scrollTop += dy;" +
-            "      else if (document.body) document.body.scrollTop += dy;" +
-            "    }" +
-            "    var finalWinX = window.scrollX || window.pageXOffset || (document.scrollingElement ? document.scrollingElement.scrollLeft : 0);" +
-            "    var finalWinY = window.scrollY || window.pageYOffset || (document.scrollingElement ? document.scrollingElement.scrollTop : 0);" +
-            "    if (dx !== 0 && Math.abs(finalWinX - oldWinX) > 0.5) scrolled = true;" +
-            "    if (dy !== 0 && Math.abs(finalWinY - oldWinY) > 0.5) scrolled = true;" +
             "  }" +
-            "  var canUp = target ? (target.scrollTop > 4) : (window.scrollY > 4);" +
-            "  var canDown = target ? (target.scrollTop + target.clientHeight < target.scrollHeight - 8) : (window.innerHeight + window.scrollY < document.documentElement.scrollHeight - 8);" +
-            "  return JSON.stringify({canUp: canUp, canDown: canDown, scrolled: scrolled, target: (target ? target.tagName : 'none'), scrollX: (window.scrollX || window.pageXOffset || 0), scrollWidth: document.documentElement.scrollWidth, innerWidth: window.innerWidth});" +
+            "  var nowTop = target ? target.scrollTop : (window.scrollY || window.pageYOffset || (document.scrollingElement ? document.scrollingElement.scrollTop : 0) || (document.documentElement ? document.documentElement.scrollTop : 0) || (document.body ? document.body.scrollTop : 0));" +
+            "  var docHeight = Math.max(document.documentElement ? document.documentElement.scrollHeight : 0, document.body ? document.body.scrollHeight : 0, document.scrollingElement ? document.scrollingElement.scrollHeight : 0);" +
+            "  var canUp = target ? (nowTop > 4) : (nowTop > 4);" +
+            "  var canDown = target ? (nowTop + target.clientHeight < target.scrollHeight - 8) : (window.innerHeight + nowTop < docHeight - 8);" +
+            "  return JSON.stringify({canUp: canUp, canDown: canDown, scrolled: scrolled, atEdge: atEdge, target: (target ? target.tagName : 'none'), scrollY: nowTop});" +
             "})(" + targetX + ", " + targetY + ", " + dx + ", " + dy + ");";
 
         webView.evaluateJavascript(js, new ValueCallback<String>() {
@@ -1288,8 +1322,17 @@ public class MainActivity extends Activity {
                         containerCanScrollUp = obj.optBoolean("canUp", true);
                         containerCanScrollDown = obj.optBoolean("canDown", true);
                         boolean scrolled = obj.optBoolean("scrolled", false);
-                        if (!scrolled) {
-                            webView.scrollBy(dx, dy);
+                        boolean atEdge = obj.optBoolean("atEdge", false);
+                        if (!scrolled && !atEdge) {
+                            if (dy < 0 && webView.getScrollY() > 0) {
+                                int newY = Math.max(0, webView.getScrollY() + dy);
+                                webView.scrollTo(webView.getScrollX(), newY);
+                            } else if (dy > 0 && containerCanScrollDown) {
+                                webView.scrollBy(dx, dy);
+                            }
+                        }
+                        if (webView.getScrollY() < 0) {
+                            webView.scrollTo(webView.getScrollX(), 0);
                         }
                     } catch (Exception ignored) {}
                 }
@@ -1626,11 +1669,15 @@ public class MainActivity extends Activity {
                 return true;
             }
             if (keyCode == KeyEvent.KEYCODE_PAGE_DOWN || keyCode == KeyEvent.KEYCODE_MEDIA_FAST_FORWARD || keyCode == KeyEvent.KEYCODE_CHANNEL_DOWN) {
-                scrollWeb(0, 350);
+                if (containerCanScrollDown) {
+                    scrollWeb(0, 350);
+                }
                 return true;
             }
             if (keyCode == KeyEvent.KEYCODE_PAGE_UP || keyCode == KeyEvent.KEYCODE_MEDIA_REWIND || keyCode == KeyEvent.KEYCODE_CHANNEL_UP) {
-                scrollWeb(0, -350);
+                if (containerCanScrollUp) {
+                    scrollWeb(0, -350);
+                }
                 return true;
             }
         }
@@ -1751,10 +1798,10 @@ public class MainActivity extends Activity {
 
             if (action == KeyEvent.ACTION_DOWN) {
                 float step = (event.getRepeatCount() > 2) ? CURSOR_REPEAT_STEP_PX : CURSOR_STEP_PX;
-                float minX = 0f;
-                float maxX = (float) screenWidth;
-                float minY = 0f;
-                float maxY = (float) screenHeight;
+                float minX = CURSOR_MARGIN_EDGE_PX;
+                float maxX = (float) screenWidth - CURSOR_MARGIN_EDGE_PX;
+                float minY = CURSOR_MARGIN_EDGE_PX;
+                float maxY = (float) screenHeight - CURSOR_MARGIN_EDGE_PX;
 
                 // Check if cursor is currently within an active modal / popup / scrollable container
                 final boolean insideModal;
@@ -1765,11 +1812,11 @@ public class MainActivity extends Activity {
 
                 if (activeModalRect != null && activeModalRect.contains(cursorX, cursorY)) {
                     insideModal = true;
-                    effectiveMinX = minX;
-                    effectiveMaxX = maxX;
-                    effectiveMinY = Math.max(minY, activeModalRect.top + dpToPx(6));
+                    effectiveMinX = Math.max(minX, activeModalRect.left + CURSOR_MARGIN_EDGE_PX / 2f);
+                    effectiveMaxX = Math.min(maxX, activeModalRect.right - CURSOR_MARGIN_EDGE_PX / 2f);
+                    effectiveMinY = Math.max(minY, activeModalRect.top + CURSOR_MARGIN_EDGE_PX / 2f);
                     float modalBottom = (activeModalRect.bottom >= screenHeight - dpToPx(80)) ?
-                            (screenHeight - dpToPx(72)) : (activeModalRect.bottom - dpToPx(8));
+                            (screenHeight - dpToPx(72)) : (activeModalRect.bottom - CURSOR_MARGIN_EDGE_PX / 2f);
                     effectiveMaxY = Math.min(maxY, modalBottom);
                 } else {
                     insideModal = false;
@@ -1799,7 +1846,9 @@ public class MainActivity extends Activity {
                                 updateCursorIcon(R.drawable.cursor_scroll_up);
                             } else {
                                 updateCursorIcon(R.drawable.cursor_scroll_up);
-                                scrollWeb(0, insideModal ? -75 : -100);
+                                if (containerCanScrollUp) {
+                                    scrollWeb(0, insideModal ? -75 : -100);
+                                }
                             }
                         } else {
                             edgeScrollTicks = 0;
@@ -1828,7 +1877,9 @@ public class MainActivity extends Activity {
                                 updateCursorIcon(R.drawable.cursor_scroll_down);
                             } else {
                                 updateCursorIcon(R.drawable.cursor_scroll_down);
-                                scrollWeb(0, insideModal ? 75 : 100);
+                                if (containerCanScrollDown) {
+                                    scrollWeb(0, insideModal ? 75 : 100);
+                                }
                             }
                         } else {
                             edgeScrollTicks = 0;

@@ -250,15 +250,15 @@
         android:textStyle="bold"
         android:visibility="gone" />
 
-    <!-- Performance & Diagnostics Debug HUD Panel -->
+    <!-- Performance & Diagnostics Debug HUD Panel (Snapped to 60px Grid) -->
     <LinearLayout
         android:id="@+id/debug_hud_panel"
-        android:layout_width="320dp"
+        android:layout_width="300dp"
         android:layout_height="wrap_content"
         android:layout_gravity="top|end"
-        android:layout_marginTop="20dp"
-        android:layout_marginEnd="20dp"
-        android:background="@drawable/bar_background"
+        android:layout_marginTop="30dp"
+        android:layout_marginEnd="30dp"
+        android:background="@drawable/debug_card_background"
         android:elevation="150dp"
         android:orientation="vertical"
         android:padding="16dp"
@@ -284,11 +284,11 @@
                 android:id="@+id/debug_text_fps"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:background="@color/status_success_bg"
-                android:paddingStart="6dp"
-                android:paddingEnd="6dp"
-                android:paddingTop="2dp"
-                android:paddingBottom="2dp"
+                android:background="@drawable/badge_fps_bg"
+                android:paddingStart="8dp"
+                android:paddingEnd="8dp"
+                android:paddingTop="3dp"
+                android:paddingBottom="3dp"
                 android:text="60 FPS"
                 android:textColor="@color/status_success"
                 android:textSize="12sp"
@@ -307,7 +307,7 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:text="NET: Checking..."
-            android:textColor="@color/text_secondary"
+            android:textColor="@color/text_primary"
             android:textSize="12sp"
             android:fontFamily="monospace" />
 
@@ -315,9 +315,9 @@
             android:id="@+id/debug_text_viewport"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="6dp"
+            android:layout_marginTop="8dp"
             android:text="VIEW: 960x540 | Screen: 1920x1080"
-            android:textColor="@color/text_secondary"
+            android:textColor="@color/text_primary"
             android:textSize="12sp"
             android:fontFamily="monospace" />
 
@@ -325,9 +325,9 @@
             android:id="@+id/debug_text_doc"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="6dp"
+            android:layout_marginTop="8dp"
             android:text="DOC: 960x1080 | Scroll: (0, 0)"
-            android:textColor="@color/text_secondary"
+            android:textColor="@color/text_primary"
             android:textSize="12sp"
             android:fontFamily="monospace" />
 
@@ -335,9 +335,9 @@
             android:id="@+id/debug_text_cursor"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="6dp"
+            android:layout_marginTop="8dp"
             android:text="CURSOR: (960, 540) | Step: 20"
-            android:textColor="@color/text_secondary"
+            android:textColor="@color/text_primary"
             android:textSize="12sp"
             android:fontFamily="monospace" />
 
@@ -345,7 +345,7 @@
             android:id="@+id/debug_text_memory"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="6dp"
+            android:layout_marginTop="8dp"
             android:text="RAM: 34 MB | Load: 450 ms"
             android:textColor="@color/text_muted"
             android:textSize="11sp"
