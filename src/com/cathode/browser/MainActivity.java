@@ -58,6 +58,8 @@ public class MainActivity extends Activity {
     private Button btnExitConfirm;
     private Button btnExitCancel;
 
+    private int currentCursorResId = R.drawable.cursor_pointer;
+
     private float cursorX = 960f;
     private float cursorY = 540f;
     private int screenWidth = 1920;
@@ -538,16 +540,6 @@ public class MainActivity extends Activity {
         }
     }
 
-    private void exitNavBarMode() {
-        isNavBarMode = false;
-        hideBottomBar();
-        bookmarksPanel.setVisibility(View.GONE);
-        urlEdit.clearFocus();
-        if (bottomBar.hasFocus()) bottomBar.clearFocus();
-        webView.requestFocus();
-        virtualCursor.setVisibility(View.VISIBLE);
-    }
-
     private void enterSearchMode() {
         isSearchingAtTop = true;
         isNavBarMode = true;
@@ -571,13 +563,37 @@ public class MainActivity extends Activity {
             searchContainer.setActivated(false);
         }
         isSearchingAtTop = false;
-        exitNavBarMode();
+        glideBarToBottom();
+    }
+
+    private void glideBarToBottom() {
+        isSearchingAtTop = false;
+        bottomBar.animate().translationY(0f).alpha(1f).setDuration(220).start();
+    }
+
+    private void exitNavBarMode() {
+        isNavBarMode = false;
+        hideBottomBar();
+        if (bookmarksPanel != null) bookmarksPanel.setVisibility(View.GONE);
+        urlEdit.clearFocus();
+        if (bottomBar.hasFocus()) bottomBar.clearFocus();
+        webView.requestFocus();
+        virtualCursor.setVisibility(View.VISIBLE);
+        updateCursorIcon(R.drawable.cursor_pointer);
+    }
+
+    private void updateCursorIcon(int resId) {
+        if (currentCursorResId != resId) {
+            currentCursorResId = resId;
+            virtualCursor.setImageResource(resId);
+        }
     }
 
     private void showExitDialog() {
         exitDialogContainer.setVisibility(View.VISIBLE);
         exitDialogContainer.bringToFront();
         virtualCursor.setVisibility(View.GONE);
+        hideKeyboard();
         handler.postDelayed(new Runnable() {
             @Override
             public void run() {
@@ -595,6 +611,7 @@ public class MainActivity extends Activity {
         } else {
             webView.requestFocus();
             virtualCursor.setVisibility(View.VISIBLE);
+            updateCursorIcon(R.drawable.cursor_pointer);
         }
     }
 
@@ -630,7 +647,7 @@ public class MainActivity extends Activity {
     private void scrollWeb(int dy) {
         long now = SystemClock.uptimeMillis();
 
-        // 1. Hardware mouse wheel scroll generic motion event
+        // Layer 1: Hardware-accelerated mouse wheel generic motion event
         try {
             MotionEvent.PointerProperties[] props = new MotionEvent.PointerProperties[1];
             props[0] = new MotionEvent.PointerProperties();
@@ -651,23 +668,8 @@ public class MainActivity extends Activity {
             scrollEvent.recycle();
         } catch (Exception ignored) {}
 
-        // 2. Simulated touch drag gesture on webView
-        try {
-            float midX = (cursorX > 100 && cursorX < screenWidth - 100) ? cursorX : screenWidth * 0.5f;
-            float startY = screenHeight * 0.55f;
-            float endY = startY - dy;
-            MotionEvent down = MotionEvent.obtain(now, now, MotionEvent.ACTION_DOWN, midX, startY, 0);
-            MotionEvent move = MotionEvent.obtain(now, now + 12, MotionEvent.ACTION_MOVE, midX, endY, 0);
-            MotionEvent up = MotionEvent.obtain(now, now + 24, MotionEvent.ACTION_UP, midX, endY, 0);
-            webView.dispatchTouchEvent(down);
-            webView.dispatchTouchEvent(move);
-            webView.dispatchTouchEvent(up);
-            down.recycle();
-            move.recycle();
-            up.recycle();
-        } catch (Exception ignored) {}
-
-        // 3. Multi-container JS scrolling across window, root, body, and all modal/dialog containers
+        // Layer 2: Universal DOM scroll covering window, document.scrollingElement, documentElement, body,
+        // and any scrollable container/modal/dialog with overflow
         String js = "(function() {" +
             "  var dy = " + dy + ";" +
             "  window.scrollBy({top: dy, behavior: 'instant'});" +
@@ -981,7 +983,7 @@ public class MainActivity extends Activity {
                     hideExitDialog();
                     return true;
                 }
-                if (bookmarksPanel.getVisibility() == View.VISIBLE) {
+                if (bookmarksPanel != null && bookmarksPanel.getVisibility() == View.VISIBLE) {
                     closeBookmarksDrawer();
                     return true;
                 }
@@ -989,17 +991,19 @@ public class MainActivity extends Activity {
                     exitSearchMode();
                     return true;
                 }
+                // When already on the Navigation Bar: clicking BACK goes to previous page in browser history!
                 if (isNavBarMode) {
-                    exitNavBarMode();
+                    if (webView.canGoBack()) {
+                        webView.goBack();
+                        exitNavBarMode();
+                    } else {
+                        showHudToast("No previous page");
+                    }
                     return true;
                 }
-                if (webView.canGoBack()) {
-                    webView.goBack();
-                    return true;
-                } else {
-                    showExitDialog();
-                    return true;
-                }
+                // When browsing in content mode: BACK key triggers showing the navigation bar!
+                enterNavBarMode(urlEdit);
+                return true;
             }
             return true;
         }
@@ -1010,7 +1014,7 @@ public class MainActivity extends Activity {
                 if (keyCode == KeyEvent.KEYCODE_DPAD_UP || keyCode == KeyEvent.KEYCODE_DPAD_DOWN) {
                     if (isSearchingAtTop) {
                         exitSearchMode();
-                    } else if (bookmarksPanel.getVisibility() == View.VISIBLE) {
+                    } else if (bookmarksPanel != null && bookmarksPanel.getVisibility() == View.VISIBLE) {
                         closeBookmarksDrawer();
                     } else {
                         exitNavBarMode();
@@ -1048,40 +1052,39 @@ public class MainActivity extends Activity {
 
                 switch (keyCode) {
                     case KeyEvent.KEYCODE_DPAD_UP:
-                        cursorY = Math.max(minY, cursorY - step);
-                        // Upper boundary: scroll web page UP
-                        if (cursorY < dpToPx(160)) {
-                            scrollWeb(-150);
+                        if (cursorY <= minY + 4f) {
+                            // Only scroll when pushed against the very top edge of the TV
+                            scrollWeb(-180);
+                            updateCursorIcon(R.drawable.cursor_scroll_up);
+                        } else {
+                            cursorY = Math.max(minY, cursorY - step);
+                            updateCursorIcon(R.drawable.cursor_pointer);
                         }
                         break;
 
                     case KeyEvent.KEYCODE_DPAD_DOWN:
-                        cursorY = Math.min(maxY, cursorY + step);
-                        // Bottom boundary: scroll web page DOWN
-                        if (cursorY > screenHeight - dpToPx(180)) {
-                            scrollWeb(150);
-                        }
-                        // Cursor position leads to showing nav bar when near bottom
-                        if (cursorY > screenHeight - dpToPx(95)) {
-                            showBottomBar();
+                        if (cursorY >= maxY - 4f) {
+                            // Only scroll when pushed against the very bottom edge of the TV
+                            scrollWeb(180);
+                            updateCursorIcon(R.drawable.cursor_scroll_down);
+                        } else {
+                            cursorY = Math.min(maxY, cursorY + step);
+                            updateCursorIcon(R.drawable.cursor_pointer);
                         }
                         break;
 
                     case KeyEvent.KEYCODE_DPAD_LEFT:
                         cursorX = Math.max(minX, cursorX - step);
+                        updateCursorIcon(R.drawable.cursor_pointer);
                         break;
 
                     case KeyEvent.KEYCODE_DPAD_RIGHT:
                         cursorX = Math.min(maxX, cursorX + step);
+                        updateCursorIcon(R.drawable.cursor_pointer);
                         break;
                 }
                 virtualCursor.setX(cursorX);
                 virtualCursor.setY(cursorY);
-
-                // Auto-hide bar if cursor moves back up into web content
-                if (cursorY < screenHeight - dpToPx(130) && isBarVisible && !isNavBarMode && !isSearchingAtTop) {
-                    scheduleHideBottomBar(2000);
-                }
             }
             return true;
         }
@@ -1195,8 +1198,10 @@ public class MainActivity extends Activity {
 
     private void hideKeyboard() {
         InputMethodManager imm = (InputMethodManager) getSystemService(Context.INPUT_METHOD_SERVICE);
-        if (imm != null && getCurrentFocus() != null) {
-            imm.hideSoftInputFromWindow(getCurrentFocus().getWindowToken(), 0);
+        if (imm != null) {
+            View view = getCurrentFocus();
+            if (view == null) view = (urlEdit != null) ? urlEdit : getWindow().getDecorView();
+            imm.hideSoftInputFromWindow(view.getWindowToken(), 0);
         }
     }
 
@@ -1207,7 +1212,14 @@ public class MainActivity extends Activity {
     @Override
     protected void onPause() {
         super.onPause();
+        hideKeyboard();
         webView.onPause();
+    }
+
+    @Override
+    protected void onStop() {
+        super.onStop();
+        hideKeyboard();
     }
 
     @Override
@@ -1217,8 +1229,22 @@ public class MainActivity extends Activity {
     }
 
     @Override
+    public void onTrimMemory(int level) {
+        super.onTrimMemory(level);
+        if (level >= TRIM_MEMORY_MODERATE) {
+            if (webView != null) webView.freeMemory();
+        }
+    }
+
+    @Override
     protected void onDestroy() {
+        handler.removeCallbacksAndMessages(null);
+        hideKeyboard();
         if (webView != null) {
+            webView.stopLoading();
+            webView.loadUrl("about:blank");
+            webView.clearHistory();
+            webView.removeAllViews();
             webView.destroy();
         }
         super.onDestroy();

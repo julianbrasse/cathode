@@ -1,0 +1,19 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="26dp"
+    android:height="26dp"
+    android:viewportWidth="26"
+    android:viewportHeight="26">
+    <!-- Dark shadow circle -->
+    <path
+        android:fillColor="#CC0A0B10"
+        android:pathData="M13,1 A12,12 0 1,0 13,25 A12,12 0 1,0 13,1 Z" />
+    <!-- White border ring -->
+    <path
+        android:strokeColor="#FFFFFFFF"
+        android:strokeWidth="1.8"
+        android:pathData="M13,2 A11,11 0 1,0 13,24 A11,11 0 1,0 13,2 Z" />
+    <!-- Bold Down Arrow -->
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M10.5,7 L15.5,7 L15.5,13 L18.5,13 L13,19.5 L7.5,13 L10.5,13 Z" />
+</vector>
