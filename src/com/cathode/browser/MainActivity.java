@@ -273,7 +273,10 @@ public class MainActivity extends Activity {
             @Override
             public void onClick(View v) {
                 if (webView.canGoBack()) webView.goBack();
-                exitNavBarMode();
+                isNavBarMode = true;
+                virtualCursor.setVisibility(View.GONE);
+                showBottomBar();
+                btnBack.requestFocus();
             }
         });
 
@@ -302,7 +305,10 @@ public class MainActivity extends Activity {
             @Override
             public void onClick(View v) {
                 if (webView.canGoForward()) webView.goForward();
-                exitNavBarMode();
+                isNavBarMode = true;
+                virtualCursor.setVisibility(View.GONE);
+                showBottomBar();
+                btnForward.requestFocus();
             }
         });
 
@@ -331,7 +337,10 @@ public class MainActivity extends Activity {
             @Override
             public void onClick(View v) {
                 webView.reload();
-                exitNavBarMode();
+                isNavBarMode = true;
+                virtualCursor.setVisibility(View.GONE);
+                showBottomBar();
+                btnRefresh.requestFocus();
             }
         });
 
@@ -492,10 +501,21 @@ public class MainActivity extends Activity {
                         return true;
                     }
                     if (keyCode == KeyEvent.KEYCODE_DPAD_UP) {
-                        openBookmarksDrawer();
+                        if (bookmarksPanel != null && bookmarksPanel.getVisibility() == View.VISIBLE) {
+                            if (bookmarksRow2.getChildCount() > 0) {
+                                bookmarksRow2.getChildAt(0).requestFocus();
+                            } else if (bookmarksRow1.getChildCount() > 0) {
+                                bookmarksRow1.getChildAt(0).requestFocus();
+                            }
+                        } else {
+                            openBookmarksDrawer();
+                        }
                         return true;
                     }
                     if (keyCode == KeyEvent.KEYCODE_DPAD_DOWN) {
+                        if (bookmarksPanel != null && bookmarksPanel.getVisibility() == View.VISIBLE) {
+                            closeBookmarksDrawer();
+                        }
                         exitNavBarMode();
                         return true;
                     }
@@ -1147,7 +1167,8 @@ public class MainActivity extends Activity {
                 if (isNavBarMode) {
                     if (webView.canGoBack()) {
                         webView.goBack();
-                        exitNavBarMode();
+                        showBottomBar();
+                        btnBack.requestFocus();
                     } else {
                         showHudToast("No previous page");
                     }
@@ -1163,15 +1184,18 @@ public class MainActivity extends Activity {
         // 3. Navigation Bar Mode (Direct D-Pad tabbing; UP/DOWN exits)
         if (isNavBarMode || (bottomBar != null && bottomBar.hasFocus())) {
             if (action == KeyEvent.ACTION_DOWN) {
-                if (keyCode == KeyEvent.KEYCODE_DPAD_UP || keyCode == KeyEvent.KEYCODE_DPAD_DOWN) {
-                    if (isSearchingAtTop) {
-                        exitSearchMode();
-                    } else if (bookmarksPanel != null && bookmarksPanel.getVisibility() == View.VISIBLE) {
-                        closeBookmarksDrawer();
-                    } else {
-                        exitNavBarMode();
+                if (bookmarksPanel != null && bookmarksPanel.getVisibility() == View.VISIBLE) {
+                    // Inside bookmarks panel: do NOT intercept DPAD_UP / DPAD_DOWN!
+                    // Let child views handle row navigation between Row 1, Row 2, and bottom bar.
+                } else {
+                    if (keyCode == KeyEvent.KEYCODE_DPAD_UP || keyCode == KeyEvent.KEYCODE_DPAD_DOWN) {
+                        if (isSearchingAtTop) {
+                            exitSearchMode();
+                        } else {
+                            exitNavBarMode();
+                        }
+                        return true;
                     }
-                    return true;
                 }
 
                 if (!isSearchingAtTop && urlEdit != null && urlEdit.hasFocus()) {
