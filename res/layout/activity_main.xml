@@ -16,13 +16,16 @@
         android:focusable="true"
         android:focusableInTouchMode="true" />
 
-    <!-- Top Loading Progress Indicator -->
+    <!-- Top Loading Progress Indicator (Material Blue) -->
     <ProgressBar
         android:id="@+id/page_progress"
         style="?android:attr/progressBarStyleHorizontal"
         android:layout_width="match_parent"
-        android:layout_height="3dp"
+        android:layout_height="3.5dp"
         android:layout_gravity="top"
+        android:progressTint="#2979FF"
+        android:indeterminateTint="#2979FF"
+        android:progressBackgroundTint="#202979FF"
         android:visibility="gone" />
 
     <!-- Bookmarks Drawer (2-Row Scalable Grid, Floats Directly Above Bottom Bar) -->

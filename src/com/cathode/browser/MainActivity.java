@@ -4,8 +4,10 @@ import android.app.Activity;
 import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
+import android.content.res.ColorStateList;
 import android.graphics.Color;
 import android.graphics.Rect;
+import android.graphics.RectF;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
@@ -19,6 +21,7 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.view.inputmethod.EditorInfo;
 import android.view.inputmethod.InputMethodManager;
+import android.webkit.ValueCallback;
 import android.webkit.WebChromeClient;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
@@ -60,6 +63,8 @@ public class MainActivity extends Activity {
 
     private int currentCursorResId = R.drawable.cursor_pointer;
     private int edgeScrollTicks = 0;
+    private RectF activeModalRect = null;
+    private long lastModalCheckTime = 0;
 
     private float cursorX = 960f;
     private float cursorY = 540f;
@@ -127,6 +132,11 @@ public class MainActivity extends Activity {
     private void initViews() {
         webView = findViewById(R.id.web_view);
         pageProgress = findViewById(R.id.page_progress);
+        if (pageProgress != null) {
+            ColorStateList blueTint = ColorStateList.valueOf(Color.parseColor("#2979FF"));
+            pageProgress.setProgressTintList(blueTint);
+            pageProgress.setIndeterminateTintList(blueTint);
+        }
         bottomBar = findViewById(R.id.bottom_bar);
         bookmarksPanel = findViewById(R.id.bookmarks_panel);
         bookmarksRow1 = findViewById(R.id.bookmarks_row1);
@@ -646,6 +656,59 @@ public class MainActivity extends Activity {
         webView.loadUrl(url);
     }
 
+    private void checkActiveModal(final float x, final float y) {
+        long now = SystemClock.uptimeMillis();
+        if (now - lastModalCheckTime < 200) return;
+        lastModalCheckTime = now;
+
+        String js = "(function(cx, cy) {" +
+            "  var dpr = window.devicePixelRatio || 1;" +
+            "  var el = document.elementFromPoint(cx / dpr, cy / dpr);" +
+            "  while (el && el !== document.body && el !== document.documentElement) {" +
+            "    var s = window.getComputedStyle(el);" +
+            "    var oy = s.overflowY || s.overflow;" +
+            "    var isScrollable = (oy === 'scroll' || oy === 'auto') && (el.scrollHeight > el.clientHeight + 10);" +
+            "    var isIframe = (el.tagName === 'IFRAME');" +
+            "    if (isScrollable || isIframe) {" +
+            "      var r = el.getBoundingClientRect();" +
+            "      var top = r.top * dpr;" +
+            "      var bottom = r.bottom * dpr;" +
+            "      var left = r.left * dpr;" +
+            "      var right = r.right * dpr;" +
+            "      if (r.height * dpr < (window.innerHeight * dpr - 30) || r.width * dpr < (window.innerWidth * dpr - 30)) {" +
+            "        return JSON.stringify({top: top, bottom: bottom, left: left, right: right});" +
+            "      }" +
+            "    }" +
+            "    el = el.parentElement;" +
+            "  }" +
+            "  return '';" +
+            "})(" + x + ", " + y + ");";
+
+        webView.evaluateJavascript(js, new ValueCallback<String>() {
+            @Override
+            public void onReceiveValue(String value) {
+                if (value == null || value.equals("null") || value.equals("\"\"") || value.isEmpty()) {
+                    activeModalRect = null;
+                    return;
+                }
+                try {
+                    String clean = value;
+                    if (clean.startsWith("\"") && clean.endsWith("\"")) {
+                        clean = clean.substring(1, clean.length() - 1).replace("\\\"", "\"");
+                    }
+                    JSONObject obj = new JSONObject(clean);
+                    float top = (float) obj.getDouble("top");
+                    float bottom = (float) obj.getDouble("bottom");
+                    float left = (float) obj.getDouble("left");
+                    float right = (float) obj.getDouble("right");
+                    activeModalRect = new RectF(left, top, right, bottom);
+                } catch (Exception e) {
+                    activeModalRect = null;
+                }
+            }
+        });
+    }
+
     private void scrollWeb(int dy) {
         long now = SystemClock.uptimeMillis();
 
@@ -664,13 +727,29 @@ public class MainActivity extends Activity {
 
             MotionEvent scrollEvent = MotionEvent.obtain(
                 now, now, MotionEvent.ACTION_SCROLL, 1, props, coords, 0, 0, 1.0f, 1.0f, 0, 0,
-                InputDevice.SOURCE_CLASS_POINTER, 0
+                InputDevice.SOURCE_MOUSE, 0
             );
             webView.dispatchGenericMotionEvent(scrollEvent);
             scrollEvent.recycle();
         } catch (Exception ignored) {}
 
-        // Layer 2: Universal DOM scroll covering window and any scrollable container/modal/dialog with overflow
+        // Layer 2: Targeted touch flick at (cursorX, cursorY) to scroll iframes and modals natively
+        try {
+            float fromX = cursorX;
+            float fromY = cursorY;
+            float toY = fromY - dy; // If dy > 0 (scroll down), finger drags UP; if dy < 0, finger drags DOWN
+            MotionEvent down = MotionEvent.obtain(now, now, MotionEvent.ACTION_DOWN, fromX, fromY, 0);
+            MotionEvent move = MotionEvent.obtain(now, now + 12, MotionEvent.ACTION_MOVE, fromX, toY, 0);
+            MotionEvent up = MotionEvent.obtain(now, now + 25, MotionEvent.ACTION_UP, fromX, toY, 0);
+            webView.dispatchTouchEvent(down);
+            webView.dispatchTouchEvent(move);
+            webView.dispatchTouchEvent(up);
+            down.recycle();
+            move.recycle();
+            up.recycle();
+        } catch (Exception ignored) {}
+
+        // Layer 3: Universal DOM scroll covering window and any scrollable container/modal/dialog with overflow
         String js = "(function() {" +
             "  var dy = " + dy + ";" +
             "  window.scrollBy({top: dy, behavior: 'instant'});" +
@@ -1051,59 +1130,89 @@ public class MainActivity extends Activity {
                 float minY = dpToPx(8);
                 float maxY = screenHeight - cursorSize - dpToPx(8);
 
+                // Check if cursor is currently within an active modal / popup / scrollable container
+                final boolean insideModal;
+                final float effectiveMinY;
+                final float effectiveMaxY;
+
+                if (activeModalRect != null && activeModalRect.contains(cursorX, cursorY)) {
+                    insideModal = true;
+                    effectiveMinY = Math.max(minY, activeModalRect.top + dpToPx(8));
+                    effectiveMaxY = Math.min(maxY, activeModalRect.bottom - dpToPx(8));
+                } else {
+                    insideModal = false;
+                    effectiveMinY = minY;
+                    effectiveMaxY = maxY;
+                }
+
                 switch (keyCode) {
                     case KeyEvent.KEYCODE_DPAD_UP:
-                        if (cursorY <= minY + 4f) {
+                        if (cursorY <= effectiveMinY + 4f) {
                             edgeScrollTicks++;
-                            updateCursorIcon(R.drawable.cursor_scroll_up);
-                            if (edgeScrollTicks >= 2) {
-                                // 1-click detent passed: scroll upwards with gentle, controlled step
+                            if (edgeScrollTicks == 1) {
+                                // Only switch to scroll icon after the first extra UP scroll
+                                updateCursorIcon(R.drawable.cursor_scroll_up);
+                            } else if (edgeScrollTicks >= 2) {
+                                updateCursorIcon(R.drawable.cursor_scroll_up);
                                 scrollWeb(-75);
+                            }
+                            if (insideModal && edgeScrollTicks >= 5) {
+                                activeModalRect = null;
+                                cursorY = Math.max(minY, cursorY - step);
+                                updateCursorIcon(R.drawable.cursor_pointer);
                             }
                         } else {
                             edgeScrollTicks = 0;
-                            cursorY = Math.max(minY, cursorY - step);
-                            if (cursorY <= minY + 4f) {
-                                updateCursorIcon(R.drawable.cursor_scroll_up);
-                            } else {
-                                updateCursorIcon(R.drawable.cursor_pointer);
-                            }
+                            cursorY = Math.max(effectiveMinY, cursorY - step);
+                            // On normal move to edge, KEEP NORMAL POINTER ICON!
+                            updateCursorIcon(R.drawable.cursor_pointer);
                         }
                         break;
 
                     case KeyEvent.KEYCODE_DPAD_DOWN:
-                        if (cursorY >= maxY - 4f) {
+                        if (cursorY >= effectiveMaxY - 4f) {
                             edgeScrollTicks++;
-                            updateCursorIcon(R.drawable.cursor_scroll_down);
-                            if (edgeScrollTicks >= 2) {
-                                // 1-click detent passed: scroll downwards with gentle, controlled step
+                            if (edgeScrollTicks == 1) {
+                                // Only switch to scroll icon after the first extra DOWN scroll
+                                updateCursorIcon(R.drawable.cursor_scroll_down);
+                            } else if (edgeScrollTicks >= 2) {
+                                updateCursorIcon(R.drawable.cursor_scroll_down);
                                 scrollWeb(75);
+                            }
+                            if (insideModal && edgeScrollTicks >= 5) {
+                                activeModalRect = null;
+                                cursorY = Math.min(maxY, cursorY + step);
+                                updateCursorIcon(R.drawable.cursor_pointer);
                             }
                         } else {
                             edgeScrollTicks = 0;
-                            cursorY = Math.min(maxY, cursorY + step);
-                            if (cursorY >= maxY - 4f) {
-                                updateCursorIcon(R.drawable.cursor_scroll_down);
-                            } else {
-                                updateCursorIcon(R.drawable.cursor_pointer);
-                            }
+                            cursorY = Math.min(effectiveMaxY, cursorY + step);
+                            // On normal move to edge, KEEP NORMAL POINTER ICON!
+                            updateCursorIcon(R.drawable.cursor_pointer);
                         }
                         break;
 
                     case KeyEvent.KEYCODE_DPAD_LEFT:
                         edgeScrollTicks = 0;
                         cursorX = Math.max(minX, cursorX - step);
+                        if (insideModal && activeModalRect != null && cursorX < activeModalRect.left) {
+                            activeModalRect = null;
+                        }
                         updateCursorIcon(R.drawable.cursor_pointer);
                         break;
 
                     case KeyEvent.KEYCODE_DPAD_RIGHT:
                         edgeScrollTicks = 0;
                         cursorX = Math.min(maxX, cursorX + step);
+                        if (insideModal && activeModalRect != null && cursorX > activeModalRect.right) {
+                            activeModalRect = null;
+                        }
                         updateCursorIcon(R.drawable.cursor_pointer);
                         break;
                 }
                 virtualCursor.setX(cursorX);
                 virtualCursor.setY(cursorY);
+                checkActiveModal(cursorX, cursorY);
             }
             return true;
         }
@@ -1213,6 +1322,13 @@ public class MainActivity extends Activity {
 
         eventDown.recycle();
         eventUp.recycle();
+
+        handler.postDelayed(new Runnable() {
+            @Override
+            public void run() {
+                checkActiveModal(cursorX, cursorY);
+            }
+        }, 300);
     }
 
     private void hideKeyboard() {

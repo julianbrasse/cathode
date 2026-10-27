@@ -12,10 +12,13 @@ An ultra-lean, bloat-free web browser built specifically for Android TV and Goog
 - **Back-to-Navbar Architecture**: Pressing `BACK` while browsing brings up the navigation bar instead of abruptly quitting the app.
 - **History Navigation**: Pressing `BACK` while on the navigation bar seamlessly navigates back in browser history (`webView.goBack()`).
 - **One-Touch Bar Dismissal**: Pressing D-Pad `UP` or `DOWN` on the navigation bar exits directly back to web browsing.
-- **Dynamic Edge Scroll with Detent**: Moving the virtual cursor across the screen never interferes with the UI. When the cursor lands at the screen perimeter, it morphs into an upward (`▲`) or downward (`▼`) scroll reticle without prematurely shifting content. An additional click (or holding the D-Pad) initiates smooth, gentle page scrolling in controlled 75px increments.
-- **Two-Layer Universal Scrolling**:
-  - **Layer 1 (Native)**: Hardware mouse-wheel `ACTION_SCROLL` events (`AXIS_VSCROLL`).
-  - **Layer 2 (Universal DOM)**: Deep container scrolling that handles `window`, `document.scrollingElement`, `document.body`, and nested scrollable modals (e.g. cookie / GDPR consent overlays).
+- **Intelligent Modal & Popup Edge Scrolling**: When the cursor enters any floating popup, modal dialog, dropdown menu, or iframe (such as Google's 9-dot app drawer, cookie consent sheets, or nested containers), edge scrolling dynamically binds to the boundaries of that modal. Pushing against the top or bottom of the modal smoothly scrolls the container content without requiring the cursor to travel to the distant TV screen edges.
+- **Two-Stage Scroll Detent**: Reaching any scrollable edge keeps the standard circular reticle intact. The cursor only morphs into the directional scroll reticle (`▲` / `▼`) on the first extra push in that direction, and initiates controlled 75px scrolling on subsequent clicks or hold.
+- **Material Blue Page Progress**: Clean Electric Blue (`#2979FF`) loading bar at the top of the screen instead of OEM default yellow.
+- **Three-Layer Universal Scrolling**:
+  - **Layer 1 (Native Generic Motion)**: Hardware mouse-wheel `ACTION_SCROLL` events (`AXIS_VSCROLL`) routed directly to the element under the cursor.
+  - **Layer 2 (Targeted Touch Flick)**: Physics-tuned touch gestures at `(cursorX, cursorY)` that seamlessly scroll `<iframe>` widgets and cross-origin popups where DOM access is restricted.
+  - **Layer 3 (Universal DOM)**: Deep multi-container scroll covering `window` and any scrollable container with overflow.
 - **Dedicated App Exit Flow**: A clear Exit button `[->]` on the far left of the bottom bar with an Android TV confirmation dialog (`[Cancel]` / `[Exit]`) to prevent accidental quits.
 - **Direct D-Pad Tabbing**: Full focusable support for TV remotes with high-contrast outlines (2.5dp pure white border on the URL input when focused).
 - **Instant Search with Clear Button**: One-click `[ ✕ ]` button embedded directly in the search bar to clear input or start a new search.
