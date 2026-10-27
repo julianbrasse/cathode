@@ -1,0 +1,798 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Cathode Browser — The Ultra-Lean Browser for Android TV & Google TV</title>
+  <meta name="description" content="Cathode is a lightning-fast, zero-bloat web browser engineered specifically for Android TV and Google TV with leanback remotes. Standalone 147 KB APK." />
+  <link rel="icon" type="image/png" href="ic_launcher.png" />
+  <style>
+    :root {
+      --bg: #080a0f;
+      --card-bg: rgba(18, 22, 34, 0.75);
+      --card-border: rgba(255, 255, 255, 0.08);
+      --card-hover: rgba(255, 255, 255, 0.12);
+      --primary: #2979ff;
+      --primary-glow: rgba(41, 121, 255, 0.35);
+      --primary-hover: #1e60d4;
+      --cyan: #00e5ff;
+      --text: #f3f6fc;
+      --text-muted: #8c9bb0;
+      --font: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+      --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      background-color: var(--bg);
+      color: var(--text);
+      font-family: var(--font);
+      line-height: 1.6;
+      -webkit-font-smoothing: antialiased;
+      overflow-x: hidden;
+      background-image: 
+        radial-gradient(ellipse 80% 50% at 50% -10%, rgba(41, 121, 255, 0.18), transparent 70%),
+        radial-gradient(circle at 10% 30%, rgba(0, 229, 255, 0.06), transparent 40%),
+        radial-gradient(circle at 90% 70%, rgba(41, 121, 255, 0.05), transparent 40%);
+      background-attachment: fixed;
+    }
+
+    a {
+      color: var(--primary);
+      text-decoration: none;
+      transition: color 0.2s;
+    }
+
+    a:hover {
+      color: var(--cyan);
+    }
+
+    .container {
+      max-width: 1100px;
+      margin: 0 auto;
+      padding: 0 24px;
+    }
+
+    /* Navbar */
+    header {
+      padding: 24px 0;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+      backdrop-filter: blur(12px);
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      background: rgba(8, 10, 15, 0.85);
+    }
+
+    .nav-inner {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      font-weight: 700;
+      font-size: 1.25rem;
+      color: #fff;
+      text-decoration: none;
+    }
+
+    .brand img {
+      width: 32px;
+      height: 32px;
+      border-radius: 8px;
+    }
+
+    .nav-links {
+      display: flex;
+      align-items: center;
+      gap: 24px;
+      font-size: 0.95rem;
+    }
+
+    .nav-links a {
+      color: var(--text-muted);
+    }
+
+    .nav-links a:hover {
+      color: #fff;
+    }
+
+    .nav-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      background: rgba(255, 255, 255, 0.07);
+      border: 1px solid var(--card-border);
+      padding: 8px 16px;
+      border-radius: 8px;
+      font-weight: 500;
+      color: #fff !important;
+      transition: all 0.2s;
+    }
+
+    .nav-btn:hover {
+      background: rgba(255, 255, 255, 0.12);
+      border-color: rgba(255, 255, 255, 0.2);
+    }
+
+    /* Hero Section */
+    .hero {
+      padding: 80px 0 60px;
+      text-align: center;
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      background: rgba(41, 121, 255, 0.12);
+      border: 1px solid rgba(41, 121, 255, 0.3);
+      padding: 6px 14px;
+      border-radius: 100px;
+      font-size: 0.85rem;
+      font-weight: 600;
+      color: #70a7ff;
+      margin-bottom: 24px;
+      letter-spacing: 0.02em;
+    }
+
+    .badge-dot {
+      width: 7px;
+      height: 7px;
+      background: var(--primary);
+      border-radius: 50%;
+      box-shadow: 0 0 10px var(--primary);
+    }
+
+    .hero h1 {
+      font-size: clamp(2.4rem, 5vw, 3.8rem);
+      font-weight: 800;
+      line-height: 1.15;
+      letter-spacing: -0.03em;
+      margin-bottom: 20px;
+      background: linear-gradient(180deg, #ffffff 0%, #b8c8e0 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .hero p {
+      font-size: clamp(1.1rem, 2vw, 1.3rem);
+      color: var(--text-muted);
+      max-width: 680px;
+      margin: 0 auto 36px;
+    }
+
+    .hero-actions {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      gap: 16px;
+      flex-wrap: wrap;
+      margin-bottom: 48px;
+    }
+
+    .btn-primary {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      background: var(--primary);
+      color: #fff !important;
+      padding: 14px 28px;
+      border-radius: 10px;
+      font-weight: 600;
+      font-size: 1.05rem;
+      box-shadow: 0 0 25px var(--primary-glow);
+      transition: all 0.2s;
+    }
+
+    .btn-primary:hover {
+      background: var(--primary-hover);
+      box-shadow: 0 0 35px rgba(41, 121, 255, 0.55);
+      transform: translateY(-2px);
+    }
+
+    .btn-secondary {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      background: rgba(255, 255, 255, 0.06);
+      border: 1px solid var(--card-border);
+      color: #fff !important;
+      padding: 14px 24px;
+      border-radius: 10px;
+      font-weight: 600;
+      font-size: 1.05rem;
+      transition: all 0.2s;
+    }
+
+    .btn-secondary:hover {
+      background: rgba(255, 255, 255, 0.1);
+      border-color: rgba(255, 255, 255, 0.2);
+    }
+
+    .banner-wrapper {
+      max-width: 820px;
+      margin: 0 auto;
+      border-radius: 16px;
+      overflow: hidden;
+      border: 1px solid var(--card-border);
+      box-shadow: 0 20px 50px rgba(0, 0, 0, 0.6);
+      background: #000;
+    }
+
+    .banner-wrapper img {
+      width: 100%;
+      height: auto;
+      display: block;
+    }
+
+    /* Specs / Stats bar */
+    .specs-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 16px;
+      margin: 60px 0;
+    }
+
+    .spec-card {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      padding: 24px 20px;
+      border-radius: 14px;
+      text-align: center;
+      backdrop-filter: blur(8px);
+    }
+
+    .spec-value {
+      font-size: 2rem;
+      font-weight: 800;
+      color: #fff;
+      margin-bottom: 4px;
+      background: linear-gradient(135deg, #00e5ff 0%, #2979ff 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .spec-label {
+      font-size: 0.85rem;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      font-weight: 600;
+    }
+
+    /* Feature Grid */
+    .section-title {
+      text-align: center;
+      margin: 80px 0 48px;
+    }
+
+    .section-title h2 {
+      font-size: 2.2rem;
+      font-weight: 800;
+      letter-spacing: -0.02em;
+      margin-bottom: 12px;
+      color: #fff;
+    }
+
+    .section-title p {
+      color: var(--text-muted);
+      max-width: 600px;
+      margin: 0 auto;
+      font-size: 1.05rem;
+    }
+
+    .features-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+      gap: 24px;
+      margin-bottom: 60px;
+    }
+
+    .feature-card {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 16px;
+      padding: 28px;
+      backdrop-filter: blur(8px);
+      transition: all 0.25s;
+    }
+
+    .feature-card:hover {
+      border-color: var(--card-hover);
+      transform: translateY(-3px);
+    }
+
+    .feature-icon {
+      width: 44px;
+      height: 44px;
+      border-radius: 12px;
+      background: rgba(41, 121, 255, 0.12);
+      border: 1px solid rgba(41, 121, 255, 0.25);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-bottom: 20px;
+      color: var(--cyan);
+    }
+
+    .feature-card h3 {
+      font-size: 1.25rem;
+      font-weight: 700;
+      color: #fff;
+      margin-bottom: 10px;
+    }
+
+    .feature-card p {
+      color: var(--text-muted);
+      font-size: 0.95rem;
+      line-height: 1.6;
+    }
+
+    /* Remote Guide Table */
+    .table-container {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 16px;
+      overflow: hidden;
+      margin-bottom: 80px;
+      backdrop-filter: blur(8px);
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      text-align: left;
+    }
+
+    thead th {
+      background: rgba(255, 255, 255, 0.03);
+      padding: 16px 20px;
+      font-size: 0.85rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--text-muted);
+      border-bottom: 1px solid var(--card-border);
+    }
+
+    tbody td {
+      padding: 16px 20px;
+      font-size: 0.95rem;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+      color: var(--text);
+    }
+
+    tbody tr:last-child td {
+      border-bottom: none;
+    }
+
+    tbody tr:hover {
+      background: rgba(255, 255, 255, 0.02);
+    }
+
+    .key-badge {
+      display: inline-block;
+      background: rgba(255, 255, 255, 0.08);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      padding: 4px 10px;
+      border-radius: 6px;
+      font-family: var(--font-mono);
+      font-size: 0.85rem;
+      font-weight: 600;
+      color: #fff;
+    }
+
+    /* Architecture Section */
+    .arch-card {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 16px;
+      padding: 32px;
+      margin-bottom: 30px;
+      backdrop-filter: blur(8px);
+    }
+
+    .arch-card h3 {
+      font-size: 1.35rem;
+      color: #fff;
+      margin-bottom: 14px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .arch-card p {
+      color: var(--text-muted);
+      margin-bottom: 16px;
+      font-size: 0.98rem;
+    }
+
+    /* Terminal / Code Box */
+    .code-block {
+      background: #050609;
+      border: 1px solid var(--card-border);
+      border-radius: 12px;
+      padding: 18px 20px;
+      font-family: var(--font-mono);
+      font-size: 0.9rem;
+      color: #a5b4fc;
+      overflow-x: auto;
+      margin: 16px 0;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .code-block code {
+      white-space: pre;
+    }
+
+    .copy-btn {
+      background: rgba(255, 255, 255, 0.08);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      color: var(--text-muted);
+      cursor: pointer;
+      padding: 4px 10px;
+      border-radius: 6px;
+      font-size: 0.8rem;
+      transition: all 0.2s;
+    }
+
+    .copy-btn:hover {
+      background: rgba(255, 255, 255, 0.15);
+      color: #fff;
+    }
+
+    /* Footer */
+    footer {
+      border-top: 1px solid rgba(255, 255, 255, 0.06);
+      padding: 48px 0;
+      text-align: center;
+      color: var(--text-muted);
+      font-size: 0.9rem;
+      margin-top: 60px;
+    }
+
+    .footer-links {
+      display: flex;
+      justify-content: center;
+      gap: 24px;
+      margin-bottom: 16px;
+    }
+
+    @media (max-width: 768px) {
+      .hero {
+        padding: 50px 0 40px;
+      }
+      .nav-links {
+        display: none;
+      }
+      .features-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Top Navigation -->
+  <header>
+    <div class="container nav-inner">
+      <a href="#" class="brand">
+        <img src="ic_launcher.png" alt="Cathode Logo" />
+        <span>Cathode</span>
+      </a>
+      <div class="nav-links">
+        <a href="#features">Features</a>
+        <a href="#remote">Remote Guide</a>
+        <a href="#architecture">Architecture</a>
+        <a href="#install">Install</a>
+        <a href="https://github.com/julianbrasse/cathode" target="_blank" class="nav-btn">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+            <path fill-rule="evenodd" clip-rule="evenodd" d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.53 1.032 1.53 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0022 12.017C22 6.484 17.522 2 12 2z"/>
+          </svg>
+          GitHub
+        </a>
+      </div>
+    </div>
+  </header>
+
+  <!-- Hero Section -->
+  <section class="hero">
+    <div class="container">
+      <div class="badge">
+        <span class="badge-dot"></span>
+        Cathode v3.8 Released • Zero External Dependencies
+      </div>
+      <h1>The Leanest Web Browser<br/>Built for Android TV</h1>
+      <p>
+        Engineered specifically for leanback TV remotes. Fluid 60fps scrolling, contextual modal edge boundaries, unified glass reticles, and an ultra-lean 147 KB footprint.
+      </p>
+      <div class="hero-actions">
+        <a href="https://github.com/julianbrasse/cathode/releases/download/v3.8/Cathode.apk" class="btn-primary">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+            <polyline points="7 10 12 15 17 10"></polyline>
+            <line x1="12" y1="15" x2="12" y2="3"></line>
+          </svg>
+          Download APK (147 KB)
+        </a>
+        <a href="https://github.com/julianbrasse/cathode" target="_blank" class="btn-secondary">
+          View Source Code
+        </a>
+      </div>
+
+      <div class="banner-wrapper">
+        <img src="banner.png" alt="Cathode Browser on Android TV" />
+      </div>
+    </div>
+  </section>
+
+  <!-- Core Metric Stats -->
+  <section class="container">
+    <div class="specs-grid">
+      <div class="spec-card">
+        <div class="spec-value">147 KB</div>
+        <div class="spec-label">Complete APK Size</div>
+      </div>
+      <div class="spec-card">
+        <div class="spec-value">0 ms</div>
+        <div class="spec-label">Startup Overhead</div>
+      </div>
+      <div class="spec-card">
+        <div class="spec-value">0</div>
+        <div class="spec-label">External Libraries</div>
+      </div>
+      <div class="spec-card">
+        <div class="spec-value">60 FPS</div>
+        <div class="spec-label">Smooth GPU Scroll</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Features Grid -->
+  <section id="features" class="container">
+    <div class="section-title">
+      <h2>Engineered for Television Remotes</h2>
+      <p>No air-mouse or trackpad required. Built from the ground up for standard D-Pad directional controls.</p>
+    </div>
+
+    <div class="features-grid">
+      <div class="feature-card">
+        <div class="feature-icon">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M15 18l-6-6 6-6"/>
+          </svg>
+        </div>
+        <h3>Back-to-Navbar Architecture</h3>
+        <p>Pressing <code>BACK</code> while web browsing never accidentally closes the app. It summons the navigation bar. Dismiss the bar instantly with <code>UP</code> or <code>DOWN</code>, or press <code>BACK</code> inside the navbar to step backward through web history.</p>
+      </div>
+
+      <div class="feature-card">
+        <div class="feature-icon">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
+            <line x1="9" y1="9" x2="15" y2="15"/>
+            <line x1="15" y1="9" x2="9" y2="15"/>
+          </svg>
+        </div>
+        <h3>Intelligent Modal Edge Scrolling</h3>
+        <p>When the cursor hovers inside any popup, modal card, or iframe (such as Google's 9-dot app drawer or cookie sheets), edge scrolling automatically clamps to the modal's boundaries. Pushing against the modal edge scrolls the inner container smoothly without traveling to TV bezels.</p>
+      </div>
+
+      <div class="feature-card">
+        <div class="feature-icon">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="10"/>
+            <polyline points="8 12 12 16 16 12"/>
+            <line x1="12" y1="8" x2="12" y2="16"/>
+          </svg>
+        </div>
+        <h3>Unified Glass Reticles</h3>
+        <p>Dynamic scroll reticles match the exact 3dp drop shadow, white outline, and translucent frosted glass styling of the main cursor. Engineered to deliver razor-sharp contrast whether hovering over dark cinema UI, bright white document backgrounds, or colorful video thumbnails.</p>
+      </div>
+
+      <div class="feature-card">
+        <div class="feature-icon">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/>
+          </svg>
+        </div>
+        <h3>Fluid 60 FPS Scrolling</h3>
+        <p>Eliminates harsh scroll jumping. Web pages and overflow containers leverage Chromium's hardware-composited smooth scrolling engine, paired with targeted touch fling events for isolated cross-origin iframes.</p>
+      </div>
+
+      <div class="feature-card">
+        <div class="feature-icon">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="2" y="7" width="20" height="14" rx="2" ry="2"/>
+            <path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/>
+          </svg>
+        </div>
+        <h3>Direct D-Pad Focus & Outline</h3>
+        <p>When the navigation bar is open, every button and the URL search field are fully focusable with crisp 2.5dp high-contrast outlines. An embedded one-click <code>[ ✕ ]</code> button clears the input for fast TV typing.</p>
+      </div>
+
+      <div class="feature-card">
+        <div class="feature-icon">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M18.36 6.64a9 9 0 1 1-12.73 0"/>
+            <line x1="12" y1="2" x2="12" y2="12"/>
+          </svg>
+        </div>
+        <h3>Dedicated Exit Dialog & Hygiene</h3>
+        <p>Features an explicit Exit button on the bar with a native TV confirmation dialog. On exit or background pause, Cathode stops network connections, trims memory caches, unregisters handlers, and destroys the WebView cleanly.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- Remote Key Mapping -->
+  <section id="remote" class="container">
+    <div class="section-title">
+      <h2>Remote Control Keymap</h2>
+      <p>Intuitive dual-context mapping for your standard TV remote control.</p>
+    </div>
+
+    <div class="table-container">
+      <table>
+        <thead>
+          <tr>
+            <th>Remote Button</th>
+            <th>Web Browsing Context</th>
+            <th>Navigation Bar Context</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><span class="key-badge">D-Pad Arrows</span></td>
+            <td>Moves circular glass cursor across web content</td>
+            <td>Tabs focus sequentially across navigation items</td>
+          </tr>
+          <tr>
+            <td><span class="key-badge">D-Pad OK (Center)</span></td>
+            <td>Simulates mouse left-click at cursor position</td>
+            <td>Triggers focused action (Search, Go, Exit, Bookmark)</td>
+          </tr>
+          <tr>
+            <td><span class="key-badge">D-Pad Up / Down</span></td>
+            <td>Scrolls page or modal at edges (after 1 extra push)</td>
+            <td>Dismisses navigation bar back to web browsing</td>
+          </tr>
+          <tr>
+            <td><span class="key-badge">BACK</span></td>
+            <td>Opens bottom navigation bar</td>
+            <td>Navigates backward in browser history (<code>goBack</code>)</td>
+          </tr>
+          <tr>
+            <td><span class="key-badge">Ch+ / Ch- / PgUp / PgDn</span></td>
+            <td>Scrolls page directly up / down</td>
+            <td>Scrolls page directly up / down</td>
+          </tr>
+          <tr>
+            <td><span class="key-badge" style="color: #ff5252; border-color: #ff5252;">Red Button</span></td>
+            <td colspan="2">Toggles quick Bookmarks Drawer</td>
+          </tr>
+          <tr>
+            <td><span class="key-badge" style="color: #69f0ae; border-color: #69f0ae;">Green Button</span></td>
+            <td colspan="2">Reloads active webpage</td>
+          </tr>
+          <tr>
+            <td><span class="key-badge" style="color: #40c4ff; border-color: #40c4ff;">Blue Button</span></td>
+            <td colspan="2">Instantly focuses top Search Bar</td>
+          </tr>
+          <tr>
+            <td><span class="key-badge">Exit Button [->]</span></td>
+            <td>—</td>
+            <td>Opens confirmation dialog to cleanly exit app</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- Technical Architecture -->
+  <section id="architecture" class="container">
+    <div class="section-title">
+      <h2>Technical Setup & Engineering</h2>
+      <p>Why Cathode outperforms conventional web browsers on resource-constrained TV hardware.</p>
+    </div>
+
+    <div class="arch-card">
+      <h3>
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
+        Zero-Dependency Standalone Footprint
+      </h3>
+      <p>
+        Most TV browsers bundle heavy Chromium forks, third-party ads, tracking SDKs, or multi-megabyte UI frameworks that consume hundreds of megabytes of RAM. Cathode is compiled purely against the native Android platform SDK. By relying on Android's system-managed Chromium WebView, Cathode stays under <strong>150 KB</strong>, boots instantly, and inherits all OS-level security and GPU-rendering updates automatically.
+      </p>
+    </div>
+
+    <div class="arch-card">
+      <h3>
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg>
+        Hybrid Event Dispatching
+      </h3>
+      <p>
+        Television browsers frequently struggle to scroll inside complex iframes (like Google's app drawer) or modern single-page applications. Cathode implements a hybrid dispatch model:
+      </p>
+      <ul style="color: var(--text-muted); margin-left: 20px; margin-bottom: 16px; font-size: 0.95rem;">
+        <li><strong>Native DOM Smooth Scroll:</strong> Targets the deep element or document under the cursor via <code>window.scrollBy({top: dy, behavior: 'smooth'})</code>, avoiding compositor thread locks.</li>
+        <li><strong>Targeted Touch Drag Gestures:</strong> When hovering inside cross-origin iframes where JavaScript DOM access is restricted by the Same-Origin Policy, Cathode dispatches synthetic touch drag events directly at the cursor coordinates.</li>
+        <li><strong>Hardware Scroll Events:</strong> Injects hardware mouse-wheel <code>ACTION_SCROLL</code> events with precise vertical axis deltas.</li>
+      </ul>
+    </div>
+
+    <div class="arch-card">
+      <h3>
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+        Proactive Memory Management
+      </h3>
+      <p>
+        Television devices typically operate with constrained RAM (1.5GB to 2.5GB shared with OS and video decoders). Cathode implements:
+      </p>
+      <ul style="color: var(--text-muted); margin-left: 20px; margin-bottom: 16px; font-size: 0.95rem;">
+        <li><code>onTrimMemory(TRIM_MEMORY_MODERATE)</code>: Flushes WebView caches and background DOM bitmaps whenever the TV OS experiences memory pressure.</li>
+        <li><strong>Automatic IME Hiding:</strong> Proactively dismisses the virtual keyboard when navigating back to web content or closing dialogs to free window manager resources.</li>
+        <li><strong>Complete Lifecycle Teardown:</strong> <code>onDestroy()</code> halts active network threads, unregisters message loops, loads <code>about:blank</code>, and explicitly calls <code>webView.destroy()</code>.</li>
+      </ul>
+    </div>
+  </section>
+
+  <!-- Installation Quickstart -->
+  <section id="install" class="container">
+    <div class="section-title">
+      <h2>Installation & Sideloading</h2>
+      <p>Install on any Android TV, Google TV, or Android TV Emulator in seconds via ADB.</p>
+    </div>
+
+    <div class="arch-card">
+      <h3 style="font-size: 1.15rem;">1. Connect to Android TV via ADB</h3>
+      <div class="code-block">
+        <code>adb connect &lt;YOUR-TV-IP&gt;:5555</code>
+        <button class="copy-btn" onclick="copyText('adb connect 192.168.1.8:5555')">Copy</button>
+      </div>
+
+      <h3 style="font-size: 1.15rem; margin-top: 24px;">2. Install Cathode APK</h3>
+      <div class="code-block">
+        <code>adb install -r Cathode.apk</code>
+        <button class="copy-btn" onclick="copyText('adb install -r Cathode.apk')">Copy</button>
+      </div>
+
+      <h3 style="font-size: 1.15rem; margin-top: 24px;">3. Launch Directly</h3>
+      <div class="code-block">
+        <code>adb shell am start -n com.cathode.browser/.MainActivity</code>
+        <button class="copy-btn" onclick="copyText('adb shell am start -n com.cathode.browser/.MainActivity')">Copy</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- Footer -->
+  <footer>
+    <div class="container">
+      <div class="footer-links">
+        <a href="https://github.com/julianbrasse/cathode" target="_blank">GitHub Repository</a>
+        <a href="https://github.com/julianbrasse/cathode/releases/tag/v3.8" target="_blank">Release v3.8</a>
+        <a href="https://github.com/julianbrasse/cathode/blob/main/LICENSE" target="_blank">MIT License</a>
+      </div>
+      <p>© 2026 Julian Brasse. Cathode Browser is free, open-source software built for the Android TV community.</p>
+    </div>
+  </footer>
+
+  <script>
+    function copyText(text) {
+      navigator.clipboard.writeText(text).then(function() {
+        alert("Command copied to clipboard: " + text);
+      });
+    }
+  </script>
+</body>
+</html>
