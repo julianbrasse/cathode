@@ -1,0 +1,17 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <!-- Outer Target Reticle / Diagnostics Icon -->
+    <path
+        android:fillColor="#00000000"
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="1.8"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round"
+        android:pathData="M12,2A10,10 0 1,0 22,12A10,10 0 0,0 12,2M12,6L12,9M12,15L12,18M6,12L9,12M15,12L18,12" />
+    <path
+        android:fillColor="#2979FF"
+        android:pathData="M12,12m-2,0a2,2 0 1,0 4,0a2,2 0 1,0 -4,0" />
+</vector>

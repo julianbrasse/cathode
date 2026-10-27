@@ -45,6 +45,12 @@ import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.ProgressBar;
 import android.widget.TextView;
+import android.net.ConnectivityManager;
+import android.net.Network;
+import android.net.NetworkCapabilities;
+import android.net.wifi.WifiInfo;
+import android.net.wifi.WifiManager;
+import android.view.Choreographer;
 import org.json.JSONArray;
 import org.json.JSONObject;
 
@@ -65,6 +71,25 @@ public class MainActivity extends Activity {
     private ImageButton btnRefresh;
     private ImageButton btnGo;
     private Button btnBookmarks;
+    private ImageButton btnDebug;
+
+    // Diagnostics Debug Layer
+    private boolean isDebugVisible = false;
+    private DebugGridView debugGridView;
+    private LinearLayout debugHudPanel;
+    private TextView debugTextFps;
+    private TextView debugTextNetwork;
+    private TextView debugTextViewport;
+    private TextView debugTextDoc;
+    private TextView debugTextCursor;
+    private TextView debugTextMemory;
+
+    private long lastFpsTimestamp = 0;
+    private int fpsFrameCount = 0;
+    private double currentFps = 60.0;
+    private Choreographer.FrameCallback fpsCallback = null;
+    private long pageLoadStartTime = 0;
+    private long lastPageLoadDurationMs = 0;
     private ImageView virtualCursor;
     private TextView hudToast;
 
@@ -74,6 +99,7 @@ public class MainActivity extends Activity {
 
     // Bookmark Manage Dialog
     private FrameLayout bookmarkDialogContainer;
+    private LinearLayout bookmarkDialogCard;
     private TextView textBookmarkDialogTitle;
     private EditText editBookmarkTitle;
     private ImageButton btnBookmarkClearTitle;
@@ -181,15 +207,26 @@ public class MainActivity extends Activity {
         btnForward = findViewById(R.id.btn_forward);
         btnRefresh = findViewById(R.id.btn_refresh);
         btnGo = findViewById(R.id.btn_go);
+        btnDebug = findViewById(R.id.btn_debug);
         btnBookmarks = findViewById(R.id.btn_bookmarks);
         virtualCursor = findViewById(R.id.virtual_cursor);
         hudToast = findViewById(R.id.hud_toast);
+
+        debugGridView = findViewById(R.id.debug_grid_view);
+        debugHudPanel = findViewById(R.id.debug_hud_panel);
+        debugTextFps = findViewById(R.id.debug_text_fps);
+        debugTextNetwork = findViewById(R.id.debug_text_network);
+        debugTextViewport = findViewById(R.id.debug_text_viewport);
+        debugTextDoc = findViewById(R.id.debug_text_doc);
+        debugTextCursor = findViewById(R.id.debug_text_cursor);
+        debugTextMemory = findViewById(R.id.debug_text_memory);
 
         exitDialogContainer = findViewById(R.id.exit_dialog_container);
         btnExitConfirm = findViewById(R.id.btn_exit_confirm);
         btnExitCancel = findViewById(R.id.btn_exit_cancel);
 
         bookmarkDialogContainer = findViewById(R.id.bookmark_dialog_container);
+        bookmarkDialogCard = findViewById(R.id.bookmark_dialog_card);
         textBookmarkDialogTitle = findViewById(R.id.text_bookmark_dialog_title);
         editBookmarkTitle = findViewById(R.id.edit_bookmark_title);
         btnBookmarkClearTitle = findViewById(R.id.btn_bookmark_clear_title);
@@ -344,6 +381,32 @@ public class MainActivity extends Activity {
                 }
             });
         }
+
+        View.OnFocusChangeListener dialogInputFocusListener = new View.OnFocusChangeListener() {
+            @Override
+            public void onFocusChange(View v, boolean hasFocus) {
+                if (hasFocus) {
+                    moveBookmarkDialogUp();
+                } else {
+                    handler.postDelayed(new Runnable() {
+                        @Override
+                        public void run() {
+                            boolean titleFocused = editBookmarkTitle != null && editBookmarkTitle.hasFocus();
+                            boolean urlFocused = editBookmarkUrl != null && editBookmarkUrl.hasFocus();
+                            if (!titleFocused && !urlFocused) {
+                                moveBookmarkDialogCenter();
+                            }
+                        }
+                    }, 50);
+                }
+            }
+        };
+        if (editBookmarkTitle != null) {
+            editBookmarkTitle.setOnFocusChangeListener(dialogInputFocusListener);
+        }
+        if (editBookmarkUrl != null) {
+            editBookmarkUrl.setOnFocusChangeListener(dialogInputFocusListener);
+        }
         if (btnBookmarkDelete != null) {
             btnBookmarkDelete.setOnKeyListener(new View.OnKeyListener() {
                 @Override
@@ -430,6 +493,7 @@ public class MainActivity extends Activity {
 
     private void setupWebView() {
         if (webView == null) return;
+        WebView.setWebContentsDebuggingEnabled(true);
         WebSettings settings = webView.getSettings();
         settings.setJavaScriptEnabled(true);
         settings.setDomStorageEnabled(true);
@@ -455,15 +519,21 @@ public class MainActivity extends Activity {
         webView.setWebViewClient(new WebViewClient() {
             @Override
             public void onPageStarted(WebView view, String url, android.graphics.Bitmap favicon) {
+                pageLoadStartTime = System.currentTimeMillis();
                 pageProgress.setVisibility(View.VISIBLE);
                 urlEdit.setText(url);
             }
 
             @Override
             public void onPageFinished(WebView view, String url) {
+                lastPageLoadDurationMs = System.currentTimeMillis() - pageLoadStartTime;
                 pageProgress.setVisibility(View.GONE);
                 urlEdit.setText(url);
                 injectCustomScrollbars(view);
+                injectAutoFit(view);
+                if (isDebugVisible) {
+                    updateDebugHud();
+                }
                 if (!isNavBarMode && !isSearchingAtTop) {
                     hideBottomBar();
                 }
@@ -583,6 +653,188 @@ public class MainActivity extends Activity {
         view.evaluateJavascript(js, null);
     }
 
+    private void injectAutoFit(WebView view) {
+        if (view == null) return;
+        String js = "(function() {" +
+            "  var applyFit = function() {" +
+            "    var screenCssW = 960;" +
+            "    var sw = Math.max(document.documentElement.scrollWidth || 0, document.body ? document.body.scrollWidth : 0);" +
+            "    if (sw > screenCssW + 4) {" +
+            "      var factor = screenCssW / sw;" +
+            "      factor = Math.max(0.65, Math.min(1.0, factor));" +
+            "      document.documentElement.style.zoom = '' + factor;" +
+            "    } else {" +
+            "      document.documentElement.style.zoom = '1.0';" +
+            "    }" +
+            "  };" +
+            "  applyFit();" +
+            "  setTimeout(applyFit, 400);" +
+            "  setTimeout(applyFit, 1200);" +
+            "  window.addEventListener('resize', applyFit);" +
+            "})();";
+        view.evaluateJavascript(js, null);
+    }
+
+    private void toggleDebugOverlay() {
+        isDebugVisible = !isDebugVisible;
+        if (debugGridView != null) {
+            debugGridView.setVisibility(isDebugVisible ? View.VISIBLE : View.GONE);
+            if (isDebugVisible) {
+                debugGridView.setCursorPos(cursorX, cursorY, activeModalRect);
+            }
+        }
+        if (debugHudPanel != null) {
+            debugHudPanel.setVisibility(isDebugVisible ? View.VISIBLE : View.GONE);
+        }
+        if (isDebugVisible) {
+            startDebugMonitoring();
+            showHudToast("Diagnostics Overlay: ON");
+        } else {
+            stopDebugMonitoring();
+            showHudToast("Diagnostics Overlay: OFF");
+        }
+    }
+
+    private void startDebugMonitoring() {
+        lastFpsTimestamp = 0;
+        fpsFrameCount = 0;
+        if (fpsCallback == null) {
+            fpsCallback = new Choreographer.FrameCallback() {
+                @Override
+                public void doFrame(long frameTimeNanos) {
+                    if (!isDebugVisible) return;
+                    fpsFrameCount++;
+                    if (lastFpsTimestamp == 0) {
+                        lastFpsTimestamp = frameTimeNanos;
+                    } else {
+                        long elapsed = frameTimeNanos - lastFpsTimestamp;
+                        if (elapsed >= 500_000_000L) {
+                            currentFps = (fpsFrameCount * 1_000_000_000.0) / elapsed;
+                            fpsFrameCount = 0;
+                            lastFpsTimestamp = frameTimeNanos;
+                            updateDebugHud();
+                        }
+                    }
+                    if (isDebugVisible) {
+                        Choreographer.getInstance().postFrameCallback(this);
+                    }
+                }
+            };
+            Choreographer.getInstance().postFrameCallback(fpsCallback);
+        }
+        updateDebugHud();
+    }
+
+    private void stopDebugMonitoring() {
+        if (fpsCallback != null) {
+            Choreographer.getInstance().removeFrameCallback(fpsCallback);
+            fpsCallback = null;
+        }
+    }
+
+    private void updateDebugHud() {
+        if (!isDebugVisible || debugHudPanel == null) return;
+
+        if (debugTextFps != null) {
+            String fpsStr = String.format(java.util.Locale.US, "%.0f FPS", currentFps);
+            debugTextFps.setText(fpsStr);
+            if (currentFps >= 55.0) {
+                debugTextFps.setTextColor(0xFF00E676);
+                debugTextFps.setBackgroundColor(0x2500E676);
+            } else if (currentFps >= 30.0) {
+                debugTextFps.setTextColor(0xFFFFD600);
+                debugTextFps.setBackgroundColor(0x25FFD600);
+            } else {
+                debugTextFps.setTextColor(0xFFFF5252);
+                debugTextFps.setBackgroundColor(0x25FF5252);
+            }
+        }
+
+        if (debugTextNetwork != null) {
+            debugTextNetwork.setText(getNetworkStats());
+        }
+
+        if (debugTextViewport != null) {
+            debugTextViewport.setText("VIEW: 960x540 | Screen: 1920x1080 (320dpi)");
+        }
+
+        if (debugTextMemory != null) {
+            long totalMem = Runtime.getRuntime().totalMemory() / (1024 * 1024);
+            long freeMem = Runtime.getRuntime().freeMemory() / (1024 * 1024);
+            long usedMem = totalMem - freeMem;
+            String loadStr = lastPageLoadDurationMs > 0 ? (lastPageLoadDurationMs + " ms") : "--";
+            debugTextMemory.setText("RAM: " + usedMem + " MB used | Load: " + loadStr);
+        }
+
+        if (debugTextCursor != null) {
+            String modeStr = isNavBarMode ? "Nav Bar" : (isSearchingAtTop ? "Search" : "Content");
+            debugTextCursor.setText("CURSOR: (" + (int) cursorX + ", " + (int) cursorY + ") | Mode: " + modeStr);
+        }
+
+        if (debugTextDoc != null && webView != null) {
+            String js = "(function() {" +
+                "  var sw = document.documentElement.scrollWidth || 0;" +
+                "  var sh = document.documentElement.scrollHeight || 0;" +
+                "  var sx = Math.round(window.scrollX || window.pageXOffset || 0);" +
+                "  var sy = Math.round(window.scrollY || window.pageYOffset || 0);" +
+                "  var z = document.documentElement.style.zoom || '1.0';" +
+                "  return JSON.stringify({sw: sw, sh: sh, sx: sx, sy: sy, z: z});" +
+                "})();";
+            webView.evaluateJavascript(js, new ValueCallback<String>() {
+                @Override
+                public void onReceiveValue(String value) {
+                    if (value == null || value.equals("null") || !isDebugVisible) return;
+                    try {
+                        String clean = value.replace("\\\"", "\"");
+                        if (clean.startsWith("\"") && clean.endsWith("\"")) clean = clean.substring(1, clean.length() - 1);
+                        JSONObject obj = new JSONObject(clean);
+                        int sw = obj.optInt("sw", 0);
+                        int sh = obj.optInt("sh", 0);
+                        int sx = obj.optInt("sx", 0);
+                        int sy = obj.optInt("sy", 0);
+                        String z = obj.optString("z", "1.0");
+                        if (debugTextDoc != null) {
+                            debugTextDoc.setText("DOC: " + sw + "x" + sh + " | Scroll: (" + sx + ", " + sy + ") | Zoom: " + z);
+                        }
+                    } catch (Exception ignored) {}
+                }
+            });
+        }
+    }
+
+    private String getNetworkStats() {
+        try {
+            ConnectivityManager cm = (ConnectivityManager) getSystemService(Context.CONNECTIVITY_SERVICE);
+            if (cm == null) return "NET: Unknown";
+            Network activeNet = cm.getActiveNetwork();
+            if (activeNet == null) return "NET: Disconnected";
+            NetworkCapabilities caps = cm.getNetworkCapabilities(activeNet);
+            if (caps == null) return "NET: Connected";
+            String type = "Network";
+            if (caps.hasTransport(NetworkCapabilities.TRANSPORT_WIFI)) type = "Wi-Fi";
+            else if (caps.hasTransport(NetworkCapabilities.TRANSPORT_ETHERNET)) type = "Ethernet";
+            else if (caps.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR)) type = "Cellular";
+
+            int downKbps = caps.getLinkDownstreamBandwidthKbps();
+            if (downKbps > 0) {
+                int mbps = Math.max(1, downKbps / 1000);
+                return "NET: " + type + " (" + mbps + " Mbps)";
+            }
+            if (caps.hasTransport(NetworkCapabilities.TRANSPORT_WIFI)) {
+                WifiManager wm = (WifiManager) getApplicationContext().getSystemService(Context.WIFI_SERVICE);
+                if (wm != null) {
+                    WifiInfo info = wm.getConnectionInfo();
+                    if (info != null && info.getLinkSpeed() > 0) {
+                        return "NET: Wi-Fi (" + info.getLinkSpeed() + " " + WifiInfo.LINK_SPEED_UNITS + ")";
+                    }
+                }
+            }
+            return "NET: " + type;
+        } catch (Exception e) {
+            return "NET: Connected";
+        }
+    }
+
     private void recreateWebView() {
         if (webView != null) {
             String currentUrl = (urlEdit != null && urlEdit.getText().length() > 0) ?
@@ -610,6 +862,9 @@ public class MainActivity extends Activity {
 
     private void showBookmarkDialog(final int index, String title, String url) {
         editingBookmarkIndex = index;
+        if (bookmarkDialogCard != null) {
+            bookmarkDialogCard.setTranslationY(0f);
+        }
         if (textBookmarkDialogTitle != null) {
             textBookmarkDialogTitle.setText(index < 0 ? "Add Bookmark" : "Edit Bookmark");
         }
@@ -642,6 +897,9 @@ public class MainActivity extends Activity {
         if (bookmarkDialogContainer != null) {
             bookmarkDialogContainer.setVisibility(View.GONE);
         }
+        if (bookmarkDialogCard != null) {
+            bookmarkDialogCard.setTranslationY(0f);
+        }
         editingBookmarkIndex = -1;
         hideKeyboard();
         if (!isNavBarMode) {
@@ -649,6 +907,24 @@ public class MainActivity extends Activity {
             webView.requestFocus();
         } else if (bookmarksPanel != null && bookmarksPanel.getVisibility() == View.VISIBLE) {
             focusBookmarksDrawer();
+        }
+    }
+
+    private void moveBookmarkDialogUp() {
+        if (bookmarkDialogCard != null) {
+            bookmarkDialogCard.animate()
+                    .translationY(-dpToPx(110))
+                    .setDuration(200)
+                    .start();
+        }
+    }
+
+    private void moveBookmarkDialogCenter() {
+        if (bookmarkDialogCard != null) {
+            bookmarkDialogCard.animate()
+                    .translationY(0f)
+                    .setDuration(200)
+                    .start();
         }
     }
 
@@ -864,7 +1140,8 @@ public class MainActivity extends Activity {
                         return true;
                     }
                     if (keyCode == KeyEvent.KEYCODE_DPAD_RIGHT) {
-                        btnBookmarks.requestFocus();
+                        if (btnDebug != null) btnDebug.requestFocus();
+                        else btnBookmarks.requestFocus();
                         return true;
                     }
                     if (keyCode == KeyEvent.KEYCODE_DPAD_UP || keyCode == KeyEvent.KEYCODE_DPAD_DOWN) {
@@ -875,6 +1152,35 @@ public class MainActivity extends Activity {
                 return false;
             }
         });
+
+        if (btnDebug != null) {
+            btnDebug.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    toggleDebugOverlay();
+                }
+            });
+            btnDebug.setOnKeyListener(new View.OnKeyListener() {
+                @Override
+                public boolean onKey(View v, int keyCode, KeyEvent event) {
+                    if (event.getAction() == KeyEvent.ACTION_DOWN) {
+                        if (keyCode == KeyEvent.KEYCODE_DPAD_LEFT) {
+                            btnGo.requestFocus();
+                            return true;
+                        }
+                        if (keyCode == KeyEvent.KEYCODE_DPAD_RIGHT) {
+                            btnBookmarks.requestFocus();
+                            return true;
+                        }
+                        if (keyCode == KeyEvent.KEYCODE_DPAD_UP || keyCode == KeyEvent.KEYCODE_DPAD_DOWN) {
+                            exitNavBarMode();
+                            return true;
+                        }
+                    }
+                    return false;
+                }
+            });
+        }
 
         btnClear.setOnClickListener(new View.OnClickListener() {
             @Override
@@ -984,7 +1290,8 @@ public class MainActivity extends Activity {
             public boolean onKey(View v, int keyCode, KeyEvent event) {
                 if (event.getAction() == KeyEvent.ACTION_DOWN) {
                     if (keyCode == KeyEvent.KEYCODE_DPAD_LEFT) {
-                        btnGo.requestFocus();
+                        if (btnDebug != null) btnDebug.requestFocus();
+                        else btnGo.requestFocus();
                         return true;
                     }
                     if (keyCode == KeyEvent.KEYCODE_DPAD_UP) {
@@ -1223,6 +1530,7 @@ public class MainActivity extends Activity {
                         containerCanScrollUp = true;
                         containerCanScrollDown = true;
                         isInsideIframe = false;
+                        if (isDebugVisible && debugGridView != null) debugGridView.setCursorPos(cursorX, cursorY, null);
                     }
                     return;
                 }
@@ -1240,19 +1548,21 @@ public class MainActivity extends Activity {
                     containerCanScrollUp = obj.optBoolean("canUp", true);
                     containerCanScrollDown = obj.optBoolean("canDown", true);
                     isInsideIframe = obj.optBoolean("isIframe", false);
+                    if (isDebugVisible && debugGridView != null) debugGridView.setCursorPos(cursorX, cursorY, activeModalRect);
                 } catch (Exception e) {
                     if (activeModalRect != null && !activeModalRect.contains(x, y)) {
                         activeModalRect = null;
                         containerCanScrollUp = true;
                         containerCanScrollDown = true;
                         isInsideIframe = false;
+                        if (isDebugVisible && debugGridView != null) debugGridView.setCursorPos(cursorX, cursorY, null);
                     }
                 }
             }
         });
     }
 
-    private void scrollWeb(int dx, int dy) {
+    private void scrollWeb(final int dx, final int dy) {
         boolean insideModal = (activeModalRect != null && activeModalRect.contains(cursorX, cursorY));
 
         float targetX = cursorX;
@@ -1268,7 +1578,7 @@ public class MainActivity extends Activity {
             targetY = (safeTop + safeBottom) / 2f;
         }
 
-        // Single deterministic scroll driver: sub-container if present, otherwise single window.scrollBy
+        // Single deterministic scroll driver: sub-container if present, otherwise window/document scroll
         String js = "(function(cx, cy, dx, dy) {" +
             "  var dpr = window.devicePixelRatio || 1;" +
             "  var el = document.elementFromPoint(cx / dpr, cy / dpr);" +
@@ -1301,11 +1611,29 @@ public class MainActivity extends Activity {
             "    }" +
             "  }" +
             "  if (!scrolled) {" +
+            "    var oldWinX = window.scrollX || window.pageXOffset || 0;" +
+            "    var oldWinY = window.scrollY || window.pageYOffset || 0;" +
             "    window.scrollBy(dx, dy);" +
+            "    var newWinX = window.scrollX || window.pageXOffset || 0;" +
+            "    var newWinY = window.scrollY || window.pageYOffset || 0;" +
+            "    if (dx !== 0 && newWinX === oldWinX) {" +
+            "      if (document.scrollingElement) document.scrollingElement.scrollLeft += dx;" +
+            "      else if (document.documentElement) document.documentElement.scrollLeft += dx;" +
+            "      else if (document.body) document.body.scrollLeft += dx;" +
+            "    }" +
+            "    if (dy !== 0 && newWinY === oldWinY) {" +
+            "      if (document.scrollingElement) document.scrollingElement.scrollTop += dy;" +
+            "      else if (document.documentElement) document.documentElement.scrollTop += dy;" +
+            "      else if (document.body) document.body.scrollTop += dy;" +
+            "    }" +
+            "    var finalWinX = window.scrollX || window.pageXOffset || (document.scrollingElement ? document.scrollingElement.scrollLeft : 0);" +
+            "    var finalWinY = window.scrollY || window.pageYOffset || (document.scrollingElement ? document.scrollingElement.scrollTop : 0);" +
+            "    if (dx !== 0 && Math.abs(finalWinX - oldWinX) > 0.5) scrolled = true;" +
+            "    if (dy !== 0 && Math.abs(finalWinY - oldWinY) > 0.5) scrolled = true;" +
             "  }" +
             "  var canUp = target ? (target.scrollTop > 4) : (window.scrollY > 4);" +
             "  var canDown = target ? (target.scrollTop + target.clientHeight < target.scrollHeight - 8) : (window.innerHeight + window.scrollY < document.documentElement.scrollHeight - 8);" +
-            "  return JSON.stringify({canUp: canUp, canDown: canDown});" +
+            "  return JSON.stringify({canUp: canUp, canDown: canDown, scrolled: scrolled, target: (target ? target.tagName : 'none'), scrollX: (window.scrollX || window.pageXOffset || 0), scrollWidth: document.documentElement.scrollWidth, innerWidth: window.innerWidth});" +
             "})(" + targetX + ", " + targetY + ", " + dx + ", " + dy + ");";
 
         webView.evaluateJavascript(js, new ValueCallback<String>() {
@@ -1318,6 +1646,11 @@ public class MainActivity extends Activity {
                         JSONObject obj = new JSONObject(clean);
                         containerCanScrollUp = obj.optBoolean("canUp", true);
                         containerCanScrollDown = obj.optBoolean("canDown", true);
+                        boolean scrolled = obj.optBoolean("scrolled", false);
+                        android.util.Log.e("CathodeScroll", "scrolled=" + scrolled + " json=" + clean);
+                        if (!scrolled) {
+                            webView.scrollBy(dx, dy);
+                        }
                     } catch (Exception ignored) {}
                 }
             }
@@ -1644,6 +1977,14 @@ public class MainActivity extends Activity {
 
         // Dedicated Page Scrolling Keys (Channel Up/Down, Page Up/Down, Media Rewind/FF)
         if (action == KeyEvent.ACTION_DOWN) {
+            if (keyCode == KeyEvent.KEYCODE_INFO ||
+                keyCode == KeyEvent.KEYCODE_SETTINGS ||
+                keyCode == KeyEvent.KEYCODE_CAPTIONS ||
+                keyCode == KeyEvent.KEYCODE_GUIDE ||
+                keyCode == KeyEvent.KEYCODE_LAST_CHANNEL) {
+                toggleDebugOverlay();
+                return true;
+            }
             if (keyCode == KeyEvent.KEYCODE_PAGE_DOWN || keyCode == KeyEvent.KEYCODE_MEDIA_FAST_FORWARD || keyCode == KeyEvent.KEYCODE_CHANNEL_DOWN) {
                 scrollWeb(0, 350);
                 return true;
@@ -1785,8 +2126,8 @@ public class MainActivity extends Activity {
 
                 if (activeModalRect != null && activeModalRect.contains(cursorX, cursorY)) {
                     insideModal = true;
-                    effectiveMinX = Math.max(minX, activeModalRect.left + dpToPx(6));
-                    effectiveMaxX = Math.min(maxX, activeModalRect.right - dpToPx(6));
+                    effectiveMinX = minX;
+                    effectiveMaxX = maxX;
                     effectiveMinY = Math.max(minY, activeModalRect.top + dpToPx(6));
                     float modalBottom = (activeModalRect.bottom >= screenHeight - dpToPx(80)) ?
                             (screenHeight - dpToPx(72)) : (activeModalRect.bottom - dpToPx(8));
@@ -1859,57 +2200,37 @@ public class MainActivity extends Activity {
                         break;
 
                     case KeyEvent.KEYCODE_DPAD_LEFT:
-                        if (cursorX <= effectiveMinX + 4f) {
-                            if (insideModal && edgeScrollTicks >= 2) {
-                                activeModalRect = null;
-                                isInsideIframe = false;
-                                cursorX = Math.max(minX, cursorX - step);
-                                updateCursorIcon(R.drawable.cursor_pointer);
-                                edgeScrollTicks = 0;
-                                break;
-                            }
+                        if (cursorX <= minX + 4f) {
                             edgeScrollTicks++;
-                            if (edgeScrollTicks > 1) {
-                                scrollWeb(insideModal ? -75 : -100, 0);
-                            }
+                            int hScrollAmount = event.getRepeatCount() > 1 ? -140 : -90;
+                            scrollWeb(hScrollAmount, 0);
                         } else {
                             edgeScrollTicks = 0;
-                            cursorX = Math.max(effectiveMinX, cursorX - step);
-                            if (insideModal && activeModalRect != null && cursorX < activeModalRect.left) {
-                                activeModalRect = null;
-                                isInsideIframe = false;
-                            }
+                            cursorX = Math.max(minX, cursorX - step);
                             updateCursorIcon(R.drawable.cursor_pointer);
                         }
                         break;
 
                     case KeyEvent.KEYCODE_DPAD_RIGHT:
-                        if (cursorX >= effectiveMaxX - 4f) {
-                            if (insideModal && edgeScrollTicks >= 2) {
-                                activeModalRect = null;
-                                isInsideIframe = false;
-                                cursorX = Math.min(maxX, cursorX + step);
-                                updateCursorIcon(R.drawable.cursor_pointer);
-                                edgeScrollTicks = 0;
-                                break;
-                            }
+                        if (cursorX >= maxX - 4f) {
                             edgeScrollTicks++;
-                            if (edgeScrollTicks > 1) {
-                                scrollWeb(insideModal ? 75 : 100, 0);
-                            }
+                            int hScrollAmount = event.getRepeatCount() > 1 ? 140 : 90;
+                            scrollWeb(hScrollAmount, 0);
                         } else {
                             edgeScrollTicks = 0;
-                            cursorX = Math.min(effectiveMaxX, cursorX + step);
-                            if (insideModal && activeModalRect != null && cursorX > activeModalRect.right) {
-                                activeModalRect = null;
-                                isInsideIframe = false;
-                            }
+                            cursorX = Math.min(maxX, cursorX + step);
                             updateCursorIcon(R.drawable.cursor_pointer);
                         }
                         break;
                 }
                 virtualCursor.setX(cursorX);
                 virtualCursor.setY(cursorY);
+                if (isDebugVisible) {
+                    if (debugGridView != null) debugGridView.setCursorPos(cursorX, cursorY, activeModalRect);
+                    if (debugTextCursor != null) {
+                        debugTextCursor.setText("CURSOR: (" + (int) cursorX + ", " + (int) cursorY + ") | Mode: Content");
+                    }
+                }
                 checkActiveModal(cursorX, cursorY);
             }
             return true;
