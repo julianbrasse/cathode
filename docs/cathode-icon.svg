@@ -1,0 +1,58 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#12151E"/>
+      <stop offset="50%" stop-color="#090B10"/>
+      <stop offset="100%" stop-color="#040507"/>
+    </linearGradient>
+
+    <linearGradient id="ringGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#00F5D4"/>
+      <stop offset="50%" stop-color="#00BAF8"/>
+      <stop offset="100%" stop-color="#3B82F6"/>
+    </linearGradient>
+
+    <linearGradient id="beam" x1="0%" y1="50%" x2="100%" y2="50%">
+      <stop offset="0%" stop-color="#00F5D4" stop-opacity="0"/>
+      <stop offset="35%" stop-color="#00F5D4" stop-opacity="0.9"/>
+      <stop offset="50%" stop-color="#FFFFFF" stop-opacity="1"/>
+      <stop offset="65%" stop-color="#00BAF8" stop-opacity="0.9"/>
+      <stop offset="100%" stop-color="#00BAF8" stop-opacity="0"/>
+    </linearGradient>
+
+    <linearGradient id="rim" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#FFFFFF" stop-opacity="0.22"/>
+      <stop offset="100%" stop-color="#FFFFFF" stop-opacity="0.04"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Background Squircle -->
+  <rect x="12" y="12" width="488" height="488" rx="116" ry="116" fill="url(#bg)" stroke="url(#rim)" stroke-width="2.5"/>
+
+  <!-- Subtle Ambient Glow -->
+  <circle cx="256" cy="256" r="180" fill="#00BAF8" opacity="0.08"/>
+
+  <!-- Horizontal Electron Scanline / Beam -->
+  <rect x="76" y="253" width="360" height="6" rx="3" fill="url(#beam)"/>
+  <rect x="146" y="254" width="220" height="4" rx="2" fill="#FFFFFF" opacity="0.95"/>
+
+  <!-- C-Aperture Ring -->
+  <path d="M 365 147 A 150 150 0 1 0 365 365"
+        fill="none"
+        stroke="url(#ringGrad)"
+        stroke-width="32"
+        stroke-linecap="round"/>
+
+  <!-- Razor-sharp white highlight on C-Aperture -->
+  <path d="M 358 154 A 150 150 0 1 0 358 358"
+        fill="none"
+        stroke="#FFFFFF"
+        stroke-width="6"
+        stroke-linecap="round"
+        opacity="0.95"/>
+
+  <!-- Central Cathode Ray Pinpoint -->
+  <circle cx="256" cy="256" r="18" fill="#00F5D4" opacity="0.3"/>
+  <circle cx="256" cy="256" r="12" fill="#FFFFFF"/>
+  <circle cx="256" cy="256" r="6" fill="#00F5D4"/>
+</svg>
