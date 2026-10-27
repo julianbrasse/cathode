@@ -14,6 +14,12 @@
             <solid android:color="#33FFFFFF" />
         </shape>
     </item>
+    <!-- Center drop shadow for contrast on white sites -->
+    <item android:top="11dp" android:left="11dp" android:right="9dp" android:bottom="9dp">
+        <shape android:shape="oval">
+            <solid android:color="#99000000" />
+        </shape>
+    </item>
     <!-- Center white pinpoint dot -->
     <item android:top="10dp" android:left="10dp" android:right="10dp" android:bottom="10dp">
         <shape android:shape="oval">

@@ -71,16 +71,15 @@ public class MainActivity extends Activity {
     private Button btnExitConfirm;
     private Button btnExitCancel;
 
-    // HTML5 Fullscreen Video
-    private FrameLayout customViewContainer;
-    private View customView;
-    private WebChromeClient.CustomViewCallback customViewCallback;
-
-    // Multi-Window / OAuth Popups
-    private FrameLayout popupContainer;
-    private FrameLayout popupWebviewHolder;
-    private ImageButton btnClosePopup;
-    private WebView popupWebView;
+    // Bookmark Manage Dialog
+    private FrameLayout bookmarkDialogContainer;
+    private EditText editBookmarkTitle;
+    private EditText editBookmarkUrl;
+    private Button btnBookmarkDelete;
+    private Button btnBookmarkCancel;
+    private Button btnBookmarkSave;
+    private int editingBookmarkIndex = -1;
+    private boolean isBookmarkManageMode = false;
 
     private int currentCursorResId = R.drawable.cursor_pointer;
     private int edgeScrollTicks = 0;
@@ -187,15 +186,125 @@ public class MainActivity extends Activity {
         btnExitConfirm = findViewById(R.id.btn_exit_confirm);
         btnExitCancel = findViewById(R.id.btn_exit_cancel);
 
-        customViewContainer = findViewById(R.id.custom_view_container);
-        popupContainer = findViewById(R.id.popup_container);
-        popupWebviewHolder = findViewById(R.id.popup_webview_holder);
-        btnClosePopup = findViewById(R.id.btn_close_popup);
-        if (btnClosePopup != null) {
-            btnClosePopup.setOnClickListener(new View.OnClickListener() {
+        bookmarkDialogContainer = findViewById(R.id.bookmark_dialog_container);
+        editBookmarkTitle = findViewById(R.id.edit_bookmark_title);
+        editBookmarkUrl = findViewById(R.id.edit_bookmark_url);
+        btnBookmarkDelete = findViewById(R.id.btn_bookmark_delete);
+        btnBookmarkCancel = findViewById(R.id.btn_bookmark_cancel);
+        btnBookmarkSave = findViewById(R.id.btn_bookmark_save);
+
+        if (btnBookmarkCancel != null) {
+            btnBookmarkCancel.setOnClickListener(new View.OnClickListener() {
                 @Override
                 public void onClick(View v) {
-                    closePopupWindow();
+                    hideBookmarkDialog();
+                }
+            });
+        }
+        if (btnBookmarkDelete != null) {
+            btnBookmarkDelete.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    deleteCurrentEditingBookmark();
+                }
+            });
+        }
+        if (btnBookmarkSave != null) {
+            btnBookmarkSave.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    saveEditedBookmark();
+                }
+            });
+        }
+
+        if (editBookmarkTitle != null) {
+            editBookmarkTitle.setOnKeyListener(new View.OnKeyListener() {
+                @Override
+                public boolean onKey(View v, int keyCode, KeyEvent event) {
+                    if (event.getAction() == KeyEvent.ACTION_DOWN) {
+                        if (keyCode == KeyEvent.KEYCODE_DPAD_DOWN) {
+                            if (editBookmarkUrl != null) editBookmarkUrl.requestFocus();
+                            return true;
+                        }
+                    }
+                    return false;
+                }
+            });
+        }
+        if (editBookmarkUrl != null) {
+            editBookmarkUrl.setOnKeyListener(new View.OnKeyListener() {
+                @Override
+                public boolean onKey(View v, int keyCode, KeyEvent event) {
+                    if (event.getAction() == KeyEvent.ACTION_DOWN) {
+                        if (keyCode == KeyEvent.KEYCODE_DPAD_UP) {
+                            if (editBookmarkTitle != null) editBookmarkTitle.requestFocus();
+                            return true;
+                        }
+                        if (keyCode == KeyEvent.KEYCODE_DPAD_DOWN) {
+                            if (btnBookmarkSave != null) btnBookmarkSave.requestFocus();
+                            return true;
+                        }
+                    }
+                    return false;
+                }
+            });
+        }
+        if (btnBookmarkDelete != null) {
+            btnBookmarkDelete.setOnKeyListener(new View.OnKeyListener() {
+                @Override
+                public boolean onKey(View v, int keyCode, KeyEvent event) {
+                    if (event.getAction() == KeyEvent.ACTION_DOWN) {
+                        if (keyCode == KeyEvent.KEYCODE_DPAD_UP) {
+                            if (editBookmarkUrl != null) editBookmarkUrl.requestFocus();
+                            return true;
+                        }
+                        if (keyCode == KeyEvent.KEYCODE_DPAD_RIGHT) {
+                            if (btnBookmarkCancel != null) btnBookmarkCancel.requestFocus();
+                            return true;
+                        }
+                    }
+                    return false;
+                }
+            });
+        }
+        if (btnBookmarkCancel != null) {
+            btnBookmarkCancel.setOnKeyListener(new View.OnKeyListener() {
+                @Override
+                public boolean onKey(View v, int keyCode, KeyEvent event) {
+                    if (event.getAction() == KeyEvent.ACTION_DOWN) {
+                        if (keyCode == KeyEvent.KEYCODE_DPAD_UP) {
+                            if (editBookmarkUrl != null) editBookmarkUrl.requestFocus();
+                            return true;
+                        }
+                        if (keyCode == KeyEvent.KEYCODE_DPAD_LEFT) {
+                            if (btnBookmarkDelete != null) btnBookmarkDelete.requestFocus();
+                            return true;
+                        }
+                        if (keyCode == KeyEvent.KEYCODE_DPAD_RIGHT) {
+                            if (btnBookmarkSave != null) btnBookmarkSave.requestFocus();
+                            return true;
+                        }
+                    }
+                    return false;
+                }
+            });
+        }
+        if (btnBookmarkSave != null) {
+            btnBookmarkSave.setOnKeyListener(new View.OnKeyListener() {
+                @Override
+                public boolean onKey(View v, int keyCode, KeyEvent event) {
+                    if (event.getAction() == KeyEvent.ACTION_DOWN) {
+                        if (keyCode == KeyEvent.KEYCODE_DPAD_UP) {
+                            if (editBookmarkUrl != null) editBookmarkUrl.requestFocus();
+                            return true;
+                        }
+                        if (keyCode == KeyEvent.KEYCODE_DPAD_LEFT) {
+                            if (btnBookmarkCancel != null) btnBookmarkCancel.requestFocus();
+                            return true;
+                        }
+                    }
+                    return false;
                 }
             });
         }
@@ -241,8 +350,6 @@ public class MainActivity extends Activity {
         settings.setAllowFileAccess(true);
         settings.setAllowContentAccess(true);
         settings.setMixedContentMode(WebSettings.MIXED_CONTENT_ALWAYS_ALLOW);
-        settings.setJavaScriptCanOpenWindowsAutomatically(true);
-        settings.setSupportMultipleWindows(true);
 
         // Modern high-res Desktop Chrome User Agent for rich CSS layouts
         settings.setUserAgentString("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36");
@@ -346,56 +453,6 @@ public class MainActivity extends Activity {
                     pageProgress.setVisibility(View.GONE);
                 }
             }
-
-            // Feature 1: HTML5 Fullscreen Video
-            @Override
-            public void onShowCustomView(View view, CustomViewCallback callback) {
-                if (customView != null) {
-                    onHideCustomView();
-                    return;
-                }
-                customView = view;
-                customViewCallback = callback;
-                if (customViewContainer != null) {
-                    customViewContainer.setVisibility(View.VISIBLE);
-                    customViewContainer.addView(view, new FrameLayout.LayoutParams(
-                            ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
-                }
-                webView.setVisibility(View.GONE);
-                bottomBar.setVisibility(View.GONE);
-                bookmarksPanel.setVisibility(View.GONE);
-                virtualCursor.setVisibility(View.GONE);
-                showHudToast("Fullscreen (Back to exit)");
-            }
-
-            @Override
-            public void onHideCustomView() {
-                if (customView == null) return;
-                if (customViewContainer != null) {
-                    customViewContainer.removeView(customView);
-                    customViewContainer.setVisibility(View.GONE);
-                }
-                customView = null;
-                if (customViewCallback != null) {
-                    customViewCallback.onCustomViewHidden();
-                    customViewCallback = null;
-                }
-                webView.setVisibility(View.VISIBLE);
-                virtualCursor.setVisibility(View.VISIBLE);
-                webView.requestFocus();
-            }
-
-            // Feature 3: Multi-Window / OAuth Popups
-            @Override
-            public boolean onCreateWindow(WebView view, boolean isDialog, boolean isUserGesture, Message resultMsg) {
-                openPopupWindow(resultMsg);
-                return true;
-            }
-
-            @Override
-            public void onCloseWindow(WebView window) {
-                closePopupWindow();
-            }
         });
 
         // Feature 4: File Downloads via Android DownloadManager
@@ -432,67 +489,89 @@ public class MainActivity extends Activity {
         }
     }
 
-    private void openPopupWindow(Message resultMsg) {
-        closePopupWindow();
-        if (popupContainer == null || popupWebviewHolder == null) return;
-
-        popupContainer.setVisibility(View.VISIBLE);
-        popupWebView = new WebView(this);
-        WebSettings popupSettings = popupWebView.getSettings();
-        popupSettings.setJavaScriptEnabled(true);
-        popupSettings.setDomStorageEnabled(true);
-        popupSettings.setDatabaseEnabled(true);
-        popupSettings.setSupportZoom(true);
-        popupSettings.setBuiltInZoomControls(true);
-        popupSettings.setDisplayZoomControls(false);
-        if (webView != null) {
-            popupSettings.setUserAgentString(webView.getSettings().getUserAgentString());
+    private void showBookmarkDialog(int index, String title, String url) {
+        editingBookmarkIndex = index;
+        if (editBookmarkTitle != null) editBookmarkTitle.setText(title);
+        if (editBookmarkUrl != null) editBookmarkUrl.setText(url);
+        if (bookmarkDialogContainer != null) {
+            bookmarkDialogContainer.setVisibility(View.VISIBLE);
+            bookmarkDialogContainer.bringToFront();
+            virtualCursor.setVisibility(View.GONE);
+            handler.postDelayed(new Runnable() {
+                @Override
+                public void run() {
+                    if (editBookmarkTitle != null) editBookmarkTitle.requestFocus();
+                }
+            }, 100);
         }
-
-        popupWebviewHolder.removeAllViews();
-        popupWebviewHolder.addView(popupWebView, new FrameLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
-
-        popupWebView.setWebViewClient(new WebViewClient() {
-            @Override
-            public boolean shouldOverrideUrlLoading(WebView view, String url) {
-                return false;
-            }
-        });
-
-        popupWebView.setWebChromeClient(new WebChromeClient() {
-            @Override
-            public void onCloseWindow(WebView window) {
-                closePopupWindow();
-            }
-        });
-
-        if (resultMsg != null && resultMsg.obj instanceof WebView.WebViewTransport) {
-            WebView.WebViewTransport transport = (WebView.WebViewTransport) resultMsg.obj;
-            transport.setWebView(popupWebView);
-            resultMsg.sendToTarget();
-        }
-
-        popupWebView.requestFocus();
-        showHudToast("Popup opened (Back to close)");
     }
 
-    private void closePopupWindow() {
-        if (popupContainer != null) {
-            popupContainer.setVisibility(View.GONE);
+    private void hideBookmarkDialog() {
+        if (bookmarkDialogContainer != null) {
+            bookmarkDialogContainer.setVisibility(View.GONE);
         }
-        if (popupWebView != null) {
-            if (popupWebviewHolder != null) {
-                popupWebviewHolder.removeAllViews();
-            }
-            try {
-                popupWebView.destroy();
-            } catch (Exception ignored) {}
-            popupWebView = null;
-        }
-        if (webView != null) {
+        editingBookmarkIndex = -1;
+        hideKeyboard();
+        if (!isNavBarMode) {
+            virtualCursor.setVisibility(View.VISIBLE);
             webView.requestFocus();
+        } else if (bookmarksPanel != null && bookmarksPanel.getVisibility() == View.VISIBLE) {
+            if (bookmarksRow1.getChildCount() > 0) {
+                bookmarksRow1.getChildAt(0).requestFocus();
+            }
         }
+    }
+
+    private void deleteCurrentEditingBookmark() {
+        if (editingBookmarkIndex < 0) {
+            hideBookmarkDialog();
+            return;
+        }
+        try {
+            String jsonStr = prefs.getString(PREF_BOOKMARKS, "[]");
+            JSONArray arr = new JSONArray(jsonStr);
+            JSONArray updated = new JSONArray();
+            for (int i = 0; i < arr.length(); i++) {
+                if (i != editingBookmarkIndex) {
+                    updated.put(arr.getJSONObject(i));
+                }
+            }
+            prefs.edit().putString(PREF_BOOKMARKS, updated.toString()).apply();
+            showHudToast("Bookmark removed");
+            refreshBookmarksUI();
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        hideBookmarkDialog();
+    }
+
+    private void saveEditedBookmark() {
+        if (editingBookmarkIndex < 0) {
+            hideBookmarkDialog();
+            return;
+        }
+        String newTitle = editBookmarkTitle.getText().toString().trim();
+        String newUrl = editBookmarkUrl.getText().toString().trim();
+        if (newTitle.isEmpty()) newTitle = newUrl;
+        if (newUrl.isEmpty()) {
+            hideBookmarkDialog();
+            return;
+        }
+        try {
+            String jsonStr = prefs.getString(PREF_BOOKMARKS, "[]");
+            JSONArray arr = new JSONArray(jsonStr);
+            if (editingBookmarkIndex < arr.length()) {
+                JSONObject obj = arr.getJSONObject(editingBookmarkIndex);
+                obj.put("title", newTitle);
+                obj.put("url", newUrl);
+                prefs.edit().putString(PREF_BOOKMARKS, arr.toString()).apply();
+                showHudToast("Bookmark updated");
+                refreshBookmarksUI();
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        hideBookmarkDialog();
     }
 
     private void handleDownload(String url, String userAgent, String contentDisposition, String mimeType) {
@@ -781,9 +860,9 @@ public class MainActivity extends Activity {
                             } else if (bookmarksRow1.getChildCount() > 0) {
                                 bookmarksRow1.getChildAt(0).requestFocus();
                             }
-                        } else {
-                            openBookmarksDrawer();
+                            return true;
                         }
+                        exitNavBarMode();
                         return true;
                     }
                     if (keyCode == KeyEvent.KEYCODE_DPAD_DOWN) {
@@ -974,20 +1053,23 @@ public class MainActivity extends Activity {
             "  var dpr = window.devicePixelRatio || 1;" +
             "  var el = document.elementFromPoint(cx / dpr, cy / dpr);" +
             "  while (el && el !== document.body && el !== document.documentElement) {" +
-            "    var isTextarea = (el.tagName === 'TEXTAREA');" +
+            "    var isDialog = (el.getAttribute('role') === 'dialog' || el.tagName === 'DIALOG' || el.classList.contains('modal') || el.classList.contains('dialog'));" +
+            "    var isTextarea = (el.tagName === 'TEXTAREA') && (el.scrollHeight > el.clientHeight + 20);" +
             "    var isIframe = (el.tagName === 'IFRAME');" +
             "    var s = window.getComputedStyle(el);" +
             "    var oy = s.overflowY || s.overflow;" +
-            "    var isScrollable = (oy === 'scroll' || oy === 'auto') && (el.scrollHeight > el.clientHeight + 4);" +
-            "    if (isTextarea || isIframe || isScrollable) {" +
-            "      var r = el.getBoundingClientRect();" +
+            "    var isScrollable = (oy === 'scroll' || oy === 'auto') && (el.scrollHeight > el.clientHeight + 40);" +
+            "    var r = el.getBoundingClientRect();" +
+            "    var rh = r.height * dpr;" +
+            "    var rw = r.width * dpr;" +
+            "    if ((isDialog || isTextarea || isIframe || isScrollable) && (rh >= 160 || isDialog)) {" +
             "      var top = r.top * dpr;" +
             "      var bottom = r.bottom * dpr;" +
             "      var left = r.left * dpr;" +
             "      var right = r.right * dpr;" +
-            "      var canUp = isIframe ? true : (el.scrollTop > 2);" +
-            "      var canDown = isIframe ? true : (el.scrollTop + el.clientHeight < el.scrollHeight - 4);" +
-            "      if (r.height * dpr < (window.innerHeight * dpr - 20) || r.width * dpr < (window.innerWidth * dpr - 20)) {" +
+            "      var canUp = isIframe ? true : (el.scrollTop > 4);" +
+            "      var canDown = isIframe ? true : (el.scrollTop + el.clientHeight < el.scrollHeight - 8);" +
+            "      if (rh < (window.innerHeight * dpr - 40) || rw < (window.innerWidth * dpr - 40)) {" +
             "        return JSON.stringify({top: top, bottom: bottom, left: left, right: right, canUp: canUp, canDown: canDown, isIframe: isIframe});" +
             "      }" +
             "    }" +
@@ -1035,11 +1117,6 @@ public class MainActivity extends Activity {
     }
 
     private void scrollWeb(int dy) {
-        if (popupContainer != null && popupContainer.getVisibility() == View.VISIBLE && popupWebView != null) {
-            popupWebView.evaluateJavascript("window.scrollBy(0, " + dy + ");", null);
-            return;
-        }
-
         boolean insideModal = (activeModalRect != null && activeModalRect.contains(cursorX, cursorY));
 
         float targetX = cursorX;
@@ -1059,10 +1136,12 @@ public class MainActivity extends Activity {
             "  var el = document.elementFromPoint(cx / dpr, cy / dpr);" +
             "  var target = null;" +
             "  while (el && el !== document.body && el !== document.documentElement) {" +
+            "    var isDialog = (el.getAttribute('role') === 'dialog' || el.tagName === 'DIALOG' || el.classList.contains('modal') || el.classList.contains('dialog'));" +
             "    var isTextarea = (el.tagName === 'TEXTAREA');" +
             "    var s = window.getComputedStyle(el);" +
             "    var oy = s.overflowY || s.overflow;" +
-            "    if (isTextarea || ((oy === 'scroll' || oy === 'auto') && el.scrollHeight > el.clientHeight + 4)) {" +
+            "    var r = el.getBoundingClientRect();" +
+            "    if (isTextarea || isDialog || (((oy === 'scroll' || oy === 'auto') && el.scrollHeight > el.clientHeight + 40) && r.height * dpr >= 160)) {" +
             "      target = el; break;" +
             "    }" +
             "    el = el.parentElement;" +
@@ -1076,8 +1155,8 @@ public class MainActivity extends Activity {
             "  if (!scrolled) {" +
             "    window.scrollBy(0, dy);" +
             "  }" +
-            "  var canUp = target ? (target.scrollTop > 2) : (window.scrollY > 2);" +
-            "  var canDown = target ? (target.scrollTop + target.clientHeight < target.scrollHeight - 4) : true;" +
+            "  var canUp = target ? (target.scrollTop > 4) : (window.scrollY > 4);" +
+            "  var canDown = target ? (target.scrollTop + target.clientHeight < target.scrollHeight - 8) : (window.innerHeight + window.scrollY < document.documentElement.scrollHeight - 8);" +
             "  return JSON.stringify({canUp: canUp, canDown: canDown});" +
             "})(" + targetX + ", " + targetY + ", " + dy + ");";
 
@@ -1148,6 +1227,7 @@ public class MainActivity extends Activity {
     }
 
     private void closeBookmarksDrawer() {
+        isBookmarkManageMode = false;
         bookmarksPanel.setVisibility(View.GONE);
         if (isNavBarMode) {
             btnBookmarks.requestFocus();
@@ -1184,7 +1264,7 @@ public class MainActivity extends Activity {
         bookmarksRow2.removeAllViews();
 
         // 1. First button in Row 1: "+ Save Current Page"
-        Button btnAdd = new Button(this);
+        final Button btnAdd = new Button(this);
         btnAdd.setText("+ Save Current Page");
         btnAdd.setTextColor(Color.WHITE);
         btnAdd.setTextSize(13f);
@@ -1202,10 +1282,39 @@ public class MainActivity extends Activity {
                 saveCurrentPageBookmark();
             }
         });
+
+        // 2. Second button in Row 1: "✎ Edit" / "✓ Done"
+        final Button btnManage = new Button(this);
+        btnManage.setText(isBookmarkManageMode ? "✓ Done" : "✎ Edit");
+        btnManage.setTextColor(isBookmarkManageMode ? Color.parseColor("#2979FF") : Color.WHITE);
+        btnManage.setTextSize(13f);
+        btnManage.setGravity(Gravity.CENTER);
+        btnManage.setIncludeFontPadding(false);
+        btnManage.setBackgroundResource(R.drawable.btn_pill_selector);
+        btnManage.setFocusable(true);
+        LinearLayout.LayoutParams lpManage = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, dpToPx(40));
+        lpManage.setMarginEnd(dpToPx(8));
+        btnManage.setLayoutParams(lpManage);
+        btnManage.setPadding(dpToPx(16), 0, dpToPx(16), 0);
+        btnManage.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                isBookmarkManageMode = !isBookmarkManageMode;
+                refreshBookmarksUI();
+                if (bookmarksRow1.getChildCount() > 1) {
+                    bookmarksRow1.getChildAt(1).requestFocus();
+                }
+            }
+        });
+
         btnAdd.setOnKeyListener(new View.OnKeyListener() {
             @Override
             public boolean onKey(View v, int keyCode, KeyEvent event) {
                 if (event.getAction() == KeyEvent.ACTION_DOWN) {
+                    if (keyCode == KeyEvent.KEYCODE_DPAD_RIGHT) {
+                        btnManage.requestFocus();
+                        return true;
+                    }
                     if (keyCode == KeyEvent.KEYCODE_DPAD_UP) {
                         closeBookmarksDrawer();
                         exitNavBarMode();
@@ -1227,9 +1336,47 @@ public class MainActivity extends Activity {
                 return false;
             }
         });
-        bookmarksRow1.addView(btnAdd);
 
-        // 2. Distribute bookmarks evenly across Row 1 and Row 2
+        btnManage.setOnKeyListener(new View.OnKeyListener() {
+            @Override
+            public boolean onKey(View v, int keyCode, KeyEvent event) {
+                if (event.getAction() == KeyEvent.ACTION_DOWN) {
+                    if (keyCode == KeyEvent.KEYCODE_DPAD_LEFT) {
+                        btnAdd.requestFocus();
+                        return true;
+                    }
+                    if (keyCode == KeyEvent.KEYCODE_DPAD_RIGHT) {
+                        if (bookmarksRow1.getChildCount() > 2) {
+                            bookmarksRow1.getChildAt(2).requestFocus();
+                            return true;
+                        }
+                    }
+                    if (keyCode == KeyEvent.KEYCODE_DPAD_UP) {
+                        closeBookmarksDrawer();
+                        exitNavBarMode();
+                        return true;
+                    }
+                    if (keyCode == KeyEvent.KEYCODE_DPAD_DOWN) {
+                        if (bookmarksRow2.getChildCount() > 0) {
+                            bookmarksRow2.getChildAt(0).requestFocus();
+                        } else {
+                            btnBookmarks.requestFocus();
+                        }
+                        return true;
+                    }
+                    if (keyCode == KeyEvent.KEYCODE_BACK) {
+                        closeBookmarksDrawer();
+                        return true;
+                    }
+                }
+                return false;
+            }
+        });
+
+        bookmarksRow1.addView(btnAdd);
+        bookmarksRow1.addView(btnManage);
+
+        // 3. Distribute bookmarks evenly across Row 1 and Row 2
         try {
             String jsonStr = prefs.getString(PREF_BOOKMARKS, "[]");
             JSONArray arr = new JSONArray(jsonStr);
@@ -1240,15 +1387,17 @@ public class MainActivity extends Activity {
                 final String title = b.getString("title");
                 final String url = b.getString("url");
                 final boolean inRow1 = (i < half);
+                final int bookmarkIndex = i;
 
                 Button chip = new Button(this);
-                chip.setText(title);
+                chip.setText(isBookmarkManageMode ? ("✎ " + title) : title);
                 chip.setTextColor(Color.WHITE);
                 chip.setTextSize(13f);
                 chip.setGravity(Gravity.CENTER);
                 chip.setIncludeFontPadding(false);
                 chip.setBackgroundResource(R.drawable.btn_pill_selector);
                 chip.setFocusable(true);
+                chip.setTag(i);
                 LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, dpToPx(40));
                 lp.setMarginEnd(dpToPx(8));
                 chip.setLayoutParams(lp);
@@ -1257,30 +1406,53 @@ public class MainActivity extends Activity {
                 chip.setOnClickListener(new View.OnClickListener() {
                     @Override
                     public void onClick(View v) {
-                        closeBookmarksDrawer();
-                        exitNavBarMode();
-                        loadUrl(url);
+                        if (isBookmarkManageMode) {
+                            showBookmarkDialog(bookmarkIndex, title, url);
+                        } else {
+                            closeBookmarksDrawer();
+                            exitNavBarMode();
+                            loadUrl(url);
+                        }
                     }
                 });
 
-                final int chipIdx = inRow1 ? (i + 1) : (i - half);
+                chip.setOnLongClickListener(new View.OnLongClickListener() {
+                    @Override
+                    public boolean onLongClick(View v) {
+                        showBookmarkDialog(bookmarkIndex, title, url);
+                        return true;
+                    }
+                });
+
+                final int r1Idx = i; // 0, 1, ...
+                final int r2Idx = i - half; // 0, 1, ...
                 chip.setOnKeyListener(new View.OnKeyListener() {
                     @Override
                     public boolean onKey(View v, int keyCode, KeyEvent event) {
                         if (event.getAction() == KeyEvent.ACTION_DOWN) {
+                            if (keyCode == KeyEvent.KEYCODE_MENU || keyCode == KeyEvent.KEYCODE_WINDOW) {
+                                showBookmarkDialog(bookmarkIndex, title, url);
+                                return true;
+                            }
+                            if (keyCode == KeyEvent.KEYCODE_DPAD_LEFT) {
+                                if (inRow1 && r1Idx == 0) {
+                                    btnManage.requestFocus();
+                                    return true;
+                                }
+                            }
                             if (keyCode == KeyEvent.KEYCODE_DPAD_UP) {
                                 if (inRow1) {
                                     closeBookmarksDrawer();
                                     exitNavBarMode();
                                 } else {
-                                    int target = Math.min(chipIdx, bookmarksRow1.getChildCount() - 1);
+                                    int target = Math.min(2 + r2Idx, bookmarksRow1.getChildCount() - 1);
                                     if (target >= 0) bookmarksRow1.getChildAt(target).requestFocus();
                                 }
                                 return true;
                             }
                             if (keyCode == KeyEvent.KEYCODE_DPAD_DOWN) {
                                 if (inRow1 && bookmarksRow2.getChildCount() > 0) {
-                                    int target = Math.min(chipIdx, bookmarksRow2.getChildCount() - 1);
+                                    int target = Math.min(r1Idx, bookmarksRow2.getChildCount() - 1);
                                     if (target >= 0) bookmarksRow2.getChildAt(target).requestFocus();
                                 } else {
                                     btnBookmarks.requestFocus();
@@ -1330,23 +1502,15 @@ public class MainActivity extends Activity {
         int keyCode = event.getKeyCode();
         int action = event.getAction();
 
-        // -2. HTML5 Fullscreen Video handling
-        if (customView != null) {
-            if (keyCode == KeyEvent.KEYCODE_BACK && action == KeyEvent.ACTION_DOWN) {
-                if (webView != null && webView.getWebChromeClient() != null) {
-                    webView.getWebChromeClient().onHideCustomView();
+        // Bookmark Edit Dialog handling
+        if (bookmarkDialogContainer != null && bookmarkDialogContainer.getVisibility() == View.VISIBLE) {
+            if (action == KeyEvent.ACTION_DOWN) {
+                if (keyCode == KeyEvent.KEYCODE_BACK) {
+                    hideBookmarkDialog();
+                    return true;
                 }
-                return true;
             }
-            return customView.dispatchKeyEvent(event);
-        }
-
-        // -1. Multi-Window / OAuth Popup handling
-        if (popupContainer != null && popupContainer.getVisibility() == View.VISIBLE) {
-            if (keyCode == KeyEvent.KEYCODE_BACK && action == KeyEvent.ACTION_DOWN) {
-                closePopupWindow();
-                return true;
-            }
+            return super.dispatchKeyEvent(event);
         }
 
         // 0. Exit Dialog handling
@@ -1396,6 +1560,21 @@ public class MainActivity extends Activity {
                 return true;
             }
             if (keyCode == KeyEvent.KEYCODE_MENU || keyCode == KeyEvent.KEYCODE_WINDOW) {
+                if (bookmarksPanel != null && bookmarksPanel.getVisibility() == View.VISIBLE) {
+                    View focused = getCurrentFocus();
+                    if (focused != null && focused.getTag() instanceof Integer) {
+                        int bIdx = (Integer) focused.getTag();
+                        try {
+                            String jsonStr = prefs.getString(PREF_BOOKMARKS, "[]");
+                            JSONArray arr = new JSONArray(jsonStr);
+                            if (bIdx >= 0 && bIdx < arr.length()) {
+                                JSONObject b = arr.getJSONObject(bIdx);
+                                showBookmarkDialog(bIdx, b.getString("title"), b.getString("url"));
+                                return true;
+                            }
+                        } catch (Exception ignored) {}
+                    }
+                }
                 if (isNavBarMode) {
                     exitNavBarMode();
                 } else {
@@ -1504,7 +1683,7 @@ public class MainActivity extends Activity {
                     case KeyEvent.KEYCODE_DPAD_UP:
                         if (cursorY <= effectiveMinY + 4f) {
                             if (insideModal) {
-                                boolean canExitModal = (edgeScrollTicks >= 3) || (!containerCanScrollUp && edgeScrollTicks >= 1);
+                                boolean canExitModal = (!containerCanScrollUp && edgeScrollTicks >= 2);
                                 if (canExitModal) {
                                     activeModalRect = null;
                                     isInsideIframe = false;
@@ -1533,7 +1712,7 @@ public class MainActivity extends Activity {
                     case KeyEvent.KEYCODE_DPAD_DOWN:
                         if (cursorY >= effectiveMaxY - 4f) {
                             if (insideModal) {
-                                boolean canExitModal = (edgeScrollTicks >= 3) || (!containerCanScrollDown && edgeScrollTicks >= 1);
+                                boolean canExitModal = (!containerCanScrollDown && edgeScrollTicks >= 2);
                                 if (canExitModal) {
                                     activeModalRect = null;
                                     isInsideIframe = false;
@@ -1605,32 +1784,34 @@ public class MainActivity extends Activity {
             }
         }).start();
 
-        // -1. If Popup is visible, check button and webview clicks
-        if (popupContainer != null && popupContainer.getVisibility() == View.VISIBLE) {
-            if (btnClosePopup != null) {
-                Rect closeRect = new Rect();
-                btnClosePopup.getGlobalVisibleRect(closeRect);
-                if (closeRect.contains((int) x, (int) y)) {
-                    closePopupWindow();
+        // -1. If Bookmark Edit Dialog is open, check button clicks
+        if (bookmarkDialogContainer != null && bookmarkDialogContainer.getVisibility() == View.VISIBLE) {
+            if (btnBookmarkSave != null) {
+                Rect saveRect = new Rect();
+                btnBookmarkSave.getGlobalVisibleRect(saveRect);
+                if (saveRect.contains((int) x, (int) y)) {
+                    btnBookmarkSave.performClick();
                     return;
                 }
             }
-            if (popupWebView != null) {
-                Rect webRect = new Rect();
-                popupWebView.getGlobalVisibleRect(webRect);
-                if (webRect.contains((int) x, (int) y)) {
-                    long downTime = SystemClock.uptimeMillis();
-                    MotionEvent eventDown = MotionEvent.obtain(downTime, downTime, MotionEvent.ACTION_DOWN, x - webRect.left, y - webRect.top, 0);
-                    MotionEvent eventUp = MotionEvent.obtain(downTime, downTime + 35, MotionEvent.ACTION_UP, x - webRect.left, y - webRect.top, 0);
-                    popupWebView.dispatchTouchEvent(eventDown);
-                    popupWebView.dispatchTouchEvent(eventUp);
-                    eventDown.recycle();
-                    eventUp.recycle();
+            if (btnBookmarkDelete != null) {
+                Rect deleteRect = new Rect();
+                btnBookmarkDelete.getGlobalVisibleRect(deleteRect);
+                if (deleteRect.contains((int) x, (int) y)) {
+                    btnBookmarkDelete.performClick();
                     return;
                 }
             }
-            // Click outside card closes popup
-            closePopupWindow();
+            if (btnBookmarkCancel != null) {
+                Rect cancelRect = new Rect();
+                btnBookmarkCancel.getGlobalVisibleRect(cancelRect);
+                if (cancelRect.contains((int) x, (int) y)) {
+                    btnBookmarkCancel.performClick();
+                    return;
+                }
+            }
+            // Click outside dialog closes it
+            hideBookmarkDialog();
             return;
         }
 
