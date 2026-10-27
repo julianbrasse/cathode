@@ -3,17 +3,27 @@
     android:height="26dp"
     android:viewportWidth="26"
     android:viewportHeight="26">
-    <!-- Dark shadow circle -->
+    <!-- Outer contrast shadow ring (matches cursor_pointer) -->
     <path
-        android:fillColor="#CC0A0B10"
-        android:pathData="M13,1 A12,12 0 1,0 13,25 A12,12 0 1,0 13,1 Z" />
-    <!-- White border ring -->
+        android:strokeColor="#99000000"
+        android:strokeWidth="3.0"
+        android:fillColor="#00000000"
+        android:pathData="M 13, 2 A 11,11 0 1,0 13, 24 A 11,11 0 1,0 13, 2 Z" />
+    <!-- Crisp white inner ring with translucent glass interior -->
     <path
         android:strokeColor="#FFFFFFFF"
+        android:strokeWidth="2.2"
+        android:fillColor="#22FFFFFF"
+        android:pathData="M 13, 2.5 A 10.5,10.5 0 1,0 13, 23.5 A 10.5,10.5 0 1,0 13, 2.5 Z" />
+    <!-- Dark contrast border for the arrow (makes it sharp on pure white) -->
+    <path
+        android:strokeColor="#CC000000"
         android:strokeWidth="1.8"
-        android:pathData="M13,2 A11,11 0 1,0 13,24 A11,11 0 1,0 13,2 Z" />
-    <!-- Bold Down Arrow -->
+        android:strokeLineJoin="round"
+        android:fillColor="#CC000000"
+        android:pathData="M11,7.5 L15,7.5 L15,12.5 L18.5,12.5 L13,18.5 L7.5,12.5 L11,12.5 Z" />
+    <!-- Crisp white down arrow -->
     <path
         android:fillColor="#FFFFFFFF"
-        android:pathData="M10.5,7 L15.5,7 L15.5,13 L18.5,13 L13,19.5 L7.5,13 L10.5,13 Z" />
+        android:pathData="M11,7.5 L15,7.5 L15,12.5 L18.5,12.5 L13,18.5 L7.5,12.5 L11,12.5 Z" />
 </vector>

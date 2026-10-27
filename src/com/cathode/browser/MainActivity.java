@@ -114,12 +114,18 @@ public class MainActivity extends Activity {
         super.onNewIntent(intent);
         setIntent(intent);
         handleIntent(intent);
+        exitNavBarMode();
     }
 
     private void handleIntent(Intent intent) {
-        if (intent != null && (Intent.ACTION_SEARCH.equals(intent.getAction()) ||
-                               "android.intent.action.SEARCH".equals(intent.getAction()) ||
-                               intent.getBooleanExtra("open_search", false))) {
+        if (intent == null) return;
+        if (Intent.ACTION_VIEW.equals(intent.getAction()) && intent.getData() != null) {
+            loadUrl(intent.getDataString());
+            return;
+        }
+        if (Intent.ACTION_SEARCH.equals(intent.getAction()) ||
+            "android.intent.action.SEARCH".equals(intent.getAction()) ||
+            intent.getBooleanExtra("open_search", false)) {
             handler.postDelayed(new Runnable() {
                 @Override
                 public void run() {
@@ -711,6 +717,7 @@ public class MainActivity extends Activity {
 
     private void scrollWeb(int dy) {
         long now = SystemClock.uptimeMillis();
+        boolean insideModal = (activeModalRect != null && activeModalRect.contains(cursorX, cursorY));
 
         // Layer 1: Hardware-accelerated mouse wheel generic motion event (1 discrete tick)
         try {
@@ -733,26 +740,28 @@ public class MainActivity extends Activity {
             scrollEvent.recycle();
         } catch (Exception ignored) {}
 
-        // Layer 2: Targeted touch flick at (cursorX, cursorY) to scroll iframes and modals natively
-        try {
-            float fromX = cursorX;
-            float fromY = cursorY;
-            float toY = fromY - dy; // If dy > 0 (scroll down), finger drags UP; if dy < 0, finger drags DOWN
-            MotionEvent down = MotionEvent.obtain(now, now, MotionEvent.ACTION_DOWN, fromX, fromY, 0);
-            MotionEvent move = MotionEvent.obtain(now, now + 12, MotionEvent.ACTION_MOVE, fromX, toY, 0);
-            MotionEvent up = MotionEvent.obtain(now, now + 25, MotionEvent.ACTION_UP, fromX, toY, 0);
-            webView.dispatchTouchEvent(down);
-            webView.dispatchTouchEvent(move);
-            webView.dispatchTouchEvent(up);
-            down.recycle();
-            move.recycle();
-            up.recycle();
-        } catch (Exception ignored) {}
+        // Layer 2: Targeted non-flinging touch drag ONLY when inside an iframe / modal popup
+        if (insideModal) {
+            try {
+                float fromX = cursorX;
+                float fromY = cursorY;
+                float toY = fromY - dy;
+                MotionEvent down = MotionEvent.obtain(now, now, MotionEvent.ACTION_DOWN, fromX, fromY, 0);
+                MotionEvent move = MotionEvent.obtain(now, now + 35, MotionEvent.ACTION_MOVE, fromX, toY, 0);
+                MotionEvent cancel = MotionEvent.obtain(now, now + 70, MotionEvent.ACTION_CANCEL, fromX, toY, 0);
+                webView.dispatchTouchEvent(down);
+                webView.dispatchTouchEvent(move);
+                webView.dispatchTouchEvent(cancel);
+                down.recycle();
+                move.recycle();
+                cancel.recycle();
+            } catch (Exception ignored) {}
+        }
 
         // Layer 3: Universal DOM scroll covering window and any scrollable container/modal/dialog with overflow
         String js = "(function() {" +
             "  var dy = " + dy + ";" +
-            "  window.scrollBy({top: dy, behavior: 'instant'});" +
+            (insideModal ? "" : "  window.scrollBy({top: dy, behavior: 'instant'});") +
             "  var all = document.querySelectorAll('div, main, section, dialog, article, aside');" +
             "  for (var i = 0; i < all.length; i++) {" +
             "    var el = all[i];" +
@@ -1089,7 +1098,7 @@ public class MainActivity extends Activity {
         }
 
         // 3. Navigation Bar Mode (Direct D-Pad tabbing; UP/DOWN exits)
-        if (isNavBarMode) {
+        if (isNavBarMode || (bottomBar != null && bottomBar.hasFocus())) {
             if (action == KeyEvent.ACTION_DOWN) {
                 if (keyCode == KeyEvent.KEYCODE_DPAD_UP || keyCode == KeyEvent.KEYCODE_DPAD_DOWN) {
                     if (isSearchingAtTop) {
