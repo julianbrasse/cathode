@@ -775,7 +775,7 @@ public class MainActivity extends Activity {
             targetY = (safeTop + safeBottom) / 2f;
         }
 
-        // 1. Hardware mouse-wheel generic motion event
+        // Layer 1: Hardware mouse-wheel generic motion event (discrete, non-flinging, penetrates iframes natively)
         try {
             MotionEvent.PointerProperties[] props = new MotionEvent.PointerProperties[1];
             props[0] = new MotionEvent.PointerProperties();
@@ -797,41 +797,7 @@ public class MainActivity extends Activity {
             scrollEvent.recycle();
         } catch (Exception ignored) {}
 
-        // 2. Localized touch flick (dispatches full gesture sequence to native Blink/Chromium compositor)
-        try {
-            float startX = targetX;
-            float startY, endY;
-            float dragDistance = Math.min(dpToPx(160), Math.max(dpToPx(80), Math.abs(dy) * 1.5f));
-
-            if (insideModal && activeModalRect != null) {
-                float safeTop = Math.max(activeModalRect.top, dpToPx(40));
-                float safeBottom = (activeModalRect.bottom >= screenHeight - dpToPx(80)) ?
-                        (screenHeight - dpToPx(72)) : activeModalRect.bottom;
-                float centerY = (safeTop + safeBottom) / 2f;
-
-                if (dy > 0) {
-                    // Scrolling DOWN: content moves up, touch drags UP
-                    startY = Math.min(safeBottom - dpToPx(20), centerY + dragDistance / 2f);
-                    endY = startY - dragDistance;
-                } else {
-                    // Scrolling UP: content moves down, touch drags DOWN
-                    startY = Math.max(safeTop + dpToPx(20), centerY - dragDistance / 2f);
-                    endY = startY + dragDistance;
-                }
-            } else {
-                startY = cursorY;
-                endY = (dy > 0) ? (startY - dragDistance) : (startY + dragDistance);
-            }
-
-            long downTime = now;
-            webView.dispatchTouchEvent(MotionEvent.obtain(downTime, downTime, MotionEvent.ACTION_DOWN, startX, startY, 0));
-            webView.dispatchTouchEvent(MotionEvent.obtain(downTime, downTime + 20, MotionEvent.ACTION_MOVE, startX, startY + (endY - startY) * 0.33f, 0));
-            webView.dispatchTouchEvent(MotionEvent.obtain(downTime, downTime + 40, MotionEvent.ACTION_MOVE, startX, startY + (endY - startY) * 0.66f, 0));
-            webView.dispatchTouchEvent(MotionEvent.obtain(downTime, downTime + 60, MotionEvent.ACTION_MOVE, startX, endY, 0));
-            webView.dispatchTouchEvent(MotionEvent.obtain(downTime, downTime + 80, MotionEvent.ACTION_UP, startX, endY, 0));
-        } catch (Exception ignored) {}
-
-        // 3. Targeted DOM scroll covering textareas, modal containers, and root window
+        // Layer 2: Deterministic DOM scroll (exact pixel calibration for textareas, sub-containers, and root page)
         String js = "(function(cx, cy, dy) {" +
             "  var dpr = window.devicePixelRatio || 1;" +
             "  var el = document.elementFromPoint(cx / dpr, cy / dpr);" +
@@ -847,9 +813,8 @@ public class MainActivity extends Activity {
             "  }" +
             "  if (target) {" +
             "    target.scrollTop += dy;" +
-            "    if (target.scrollBy) target.scrollBy({top: dy, behavior: 'smooth'});" +
             "  } else {" +
-            "    window.scrollBy({top: dy, behavior: 'smooth'});" +
+            "    window.scrollBy(0, dy);" +
             "  }" +
             "})(" + targetX + ", " + targetY + ", " + dy + ");";
         webView.evaluateJavascript(js, null);
