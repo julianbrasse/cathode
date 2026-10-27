@@ -18,6 +18,8 @@ echo "==> 2. Linking APK & generating R.java..."
 "$BUILD_TOOLS/aapt2" link build/compiled_res.zip \
   -I "$PLATFORM" \
   --manifest AndroidManifest.xml \
+  --no-xml-namespaces \
+  --enable-compact-entries \
   --java gen \
   -o build/Cathode.unaligned.apk
 
@@ -25,11 +27,11 @@ echo "==> 3. Compiling Java sources..."
 javac -d bin -cp "$PLATFORM" gen/com/cathode/browser/R.java src/com/cathode/browser/*.java
 
 echo "==> 4. Dexing bytecode..."
-"$BUILD_TOOLS/d8" --min-api 26 --output build $(find bin -name "*.class")
+"$BUILD_TOOLS/d8" --release --min-api 26 --lib "$PLATFORM" --output build $(find bin -name "*.class")
 
 echo "==> 5. Packaging classes.dex..."
 cd build
-zip -u Cathode.unaligned.apk classes.dex
+zip -9 -u Cathode.unaligned.apk classes.dex
 cd ..
 
 echo "==> 6. Zipalign..."

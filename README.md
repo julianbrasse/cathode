@@ -3,7 +3,7 @@
 An ultra-lean, bloat-free web browser built specifically for Android TV and Google TV with leanback remotes.
 
 <p align="center">
-  <img src="res/drawable/banner.png" alt="Cathode Banner" width="480"/>
+  <img src="docs/cathode-logo.svg" alt="Cathode Banner" width="560"/>
 </p>
 
 ## Highlights
