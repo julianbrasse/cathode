@@ -228,9 +228,54 @@
         android:id="@+id/virtual_cursor"
         android:layout_width="26dp"
         android:layout_height="26dp"
-        android:elevation="100dp"
+        android:elevation="180dp"
         android:src="@drawable/cursor_pointer"
         android:visibility="visible" />
+
+    <!-- Fullscreen HTML5 Video Overlay Container -->
+    <FrameLayout
+        android:id="@+id/custom_view_container"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="#000000"
+        android:elevation="150dp"
+        android:visibility="gone" />
+
+    <!-- Multi-Window / OAuth Popup Overlay Container -->
+    <FrameLayout
+        android:id="@+id/popup_container"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="#CC0A0B10"
+        android:elevation="160dp"
+        android:visibility="gone">
+
+        <FrameLayout
+            android:id="@+id/popup_card"
+            android:layout_width="1280dp"
+            android:layout_height="800dp"
+            android:layout_gravity="center"
+            android:background="@drawable/bar_background"
+            android:padding="8dp">
+
+            <FrameLayout
+                android:id="@+id/popup_webview_holder"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent" />
+
+            <ImageButton
+                android:id="@+id/btn_close_popup"
+                android:layout_width="40dp"
+                android:layout_height="40dp"
+                android:layout_gravity="top|end"
+                android:layout_margin="12dp"
+                android:background="@drawable/btn_circle_selector"
+                android:contentDescription="Close Popup"
+                android:elevation="10dp"
+                android:scaleType="center"
+                android:src="@drawable/ic_nav_clear" />
+        </FrameLayout>
+    </FrameLayout>
 
     <!-- Exit Confirmation Modal Dialog (TV-Optimized) -->
     <FrameLayout

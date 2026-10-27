@@ -1,6 +1,7 @@
 package com.cathode.browser;
 
 import android.app.Activity;
+import android.app.DownloadManager;
 import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
@@ -8,9 +9,13 @@ import android.content.res.ColorStateList;
 import android.graphics.Color;
 import android.graphics.Rect;
 import android.graphics.RectF;
+import android.net.Uri;
+import android.net.http.SslError;
 import android.os.Bundle;
+import android.os.Environment;
 import android.os.Handler;
 import android.os.Looper;
+import android.os.Message;
 import android.os.SystemClock;
 import android.util.DisplayMetrics;
 import android.view.Gravity;
@@ -21,8 +26,13 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.view.inputmethod.EditorInfo;
 import android.view.inputmethod.InputMethodManager;
+import android.webkit.DownloadListener;
+import android.webkit.RenderProcessGoneDetail;
+import android.webkit.SslErrorHandler;
+import android.webkit.URLUtil;
 import android.webkit.ValueCallback;
 import android.webkit.WebChromeClient;
+import android.webkit.WebResourceRequest;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
@@ -60,6 +70,17 @@ public class MainActivity extends Activity {
     private FrameLayout exitDialogContainer;
     private Button btnExitConfirm;
     private Button btnExitCancel;
+
+    // HTML5 Fullscreen Video
+    private FrameLayout customViewContainer;
+    private View customView;
+    private WebChromeClient.CustomViewCallback customViewCallback;
+
+    // Multi-Window / OAuth Popups
+    private FrameLayout popupContainer;
+    private FrameLayout popupWebviewHolder;
+    private ImageButton btnClosePopup;
+    private WebView popupWebView;
 
     private int currentCursorResId = R.drawable.cursor_pointer;
     private int edgeScrollTicks = 0;
@@ -166,6 +187,19 @@ public class MainActivity extends Activity {
         btnExitConfirm = findViewById(R.id.btn_exit_confirm);
         btnExitCancel = findViewById(R.id.btn_exit_cancel);
 
+        customViewContainer = findViewById(R.id.custom_view_container);
+        popupContainer = findViewById(R.id.popup_container);
+        popupWebviewHolder = findViewById(R.id.popup_webview_holder);
+        btnClosePopup = findViewById(R.id.btn_close_popup);
+        if (btnClosePopup != null) {
+            btnClosePopup.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    closePopupWindow();
+                }
+            });
+        }
+
         virtualCursor.setX(cursorX);
         virtualCursor.setY(cursorY);
 
@@ -192,6 +226,7 @@ public class MainActivity extends Activity {
     }
 
     private void setupWebView() {
+        if (webView == null) return;
         WebSettings settings = webView.getSettings();
         settings.setJavaScriptEnabled(true);
         settings.setDomStorageEnabled(true);
@@ -206,6 +241,8 @@ public class MainActivity extends Activity {
         settings.setAllowFileAccess(true);
         settings.setAllowContentAccess(true);
         settings.setMixedContentMode(WebSettings.MIXED_CONTENT_ALWAYS_ALLOW);
+        settings.setJavaScriptCanOpenWindowsAutomatically(true);
+        settings.setSupportMultipleWindows(true);
 
         // Modern high-res Desktop Chrome User Agent for rich CSS layouts
         settings.setUserAgentString("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36");
@@ -225,6 +262,74 @@ public class MainActivity extends Activity {
                     hideBottomBar();
                 }
             }
+
+            @Override
+            public boolean shouldOverrideUrlLoading(WebView view, String url) {
+                if (url == null) return false;
+                if (url.startsWith("intent:") || url.startsWith("market:") || url.startsWith("tel:") || url.startsWith("mailto:")) {
+                    try {
+                        Intent intent = Intent.parseUri(url, Intent.URI_INTENT_SCHEME);
+                        if (intent != null) {
+                            view.getContext().startActivity(intent);
+                            return true;
+                        }
+                    } catch (Exception e) {
+                        showHudToast("Cannot open external app");
+                    }
+                    return true;
+                }
+                return false;
+            }
+
+            @Override
+            public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) {
+                if (request != null && request.getUrl() != null) {
+                    return shouldOverrideUrlLoading(view, request.getUrl().toString());
+                }
+                return false;
+            }
+
+            // Feature 5: SSL & Clock-Skew Handling
+            @Override
+            public void onReceivedSslError(WebView view, final SslErrorHandler handler, SslError error) {
+                int primaryError = error.getPrimaryError();
+                String reason;
+                switch (primaryError) {
+                    case SslError.SSL_DATE_INVALID:
+                        reason = "TV clock out of sync. Check TV Date & Time settings.";
+                        break;
+                    case SslError.SSL_EXPIRED:
+                        reason = "Website SSL certificate has expired.";
+                        break;
+                    case SslError.SSL_IDMISMATCH:
+                        reason = "Website SSL hostname mismatch.";
+                        break;
+                    case SslError.SSL_UNTRUSTED:
+                        reason = "Website SSL certificate is untrusted.";
+                        break;
+                    default:
+                        reason = "SSL connection security error (" + primaryError + ").";
+                        break;
+                }
+                android.util.Log.w("CathodeBrowser", "SSL Error: " + reason + " for URL: " + error.getUrl());
+                showHudToast(reason);
+                handler.cancel();
+            }
+
+            // Feature 2: OOM / Sandboxed Render Process Crash Recovery
+            @Override
+            public boolean onRenderProcessGone(WebView view, RenderProcessGoneDetail detail) {
+                boolean didCrash = detail.didCrash();
+                android.util.Log.e("CathodeBrowser", "Chromium render process terminated. Did crash: " + didCrash);
+                showHudToast(didCrash ? "Page crashed — reloading" : "Memory freed — reloading");
+                handler.post(new Runnable() {
+                    @Override
+                    public void run() {
+                        recreateWebView();
+                    }
+                });
+                return true; // Prevents whole app termination
+            }
         });
 
         webView.setWebChromeClient(new WebChromeClient() {
@@ -241,7 +346,176 @@ public class MainActivity extends Activity {
                     pageProgress.setVisibility(View.GONE);
                 }
             }
+
+            // Feature 1: HTML5 Fullscreen Video
+            @Override
+            public void onShowCustomView(View view, CustomViewCallback callback) {
+                if (customView != null) {
+                    onHideCustomView();
+                    return;
+                }
+                customView = view;
+                customViewCallback = callback;
+                if (customViewContainer != null) {
+                    customViewContainer.setVisibility(View.VISIBLE);
+                    customViewContainer.addView(view, new FrameLayout.LayoutParams(
+                            ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+                }
+                webView.setVisibility(View.GONE);
+                bottomBar.setVisibility(View.GONE);
+                bookmarksPanel.setVisibility(View.GONE);
+                virtualCursor.setVisibility(View.GONE);
+                showHudToast("Fullscreen (Back to exit)");
+            }
+
+            @Override
+            public void onHideCustomView() {
+                if (customView == null) return;
+                if (customViewContainer != null) {
+                    customViewContainer.removeView(customView);
+                    customViewContainer.setVisibility(View.GONE);
+                }
+                customView = null;
+                if (customViewCallback != null) {
+                    customViewCallback.onCustomViewHidden();
+                    customViewCallback = null;
+                }
+                webView.setVisibility(View.VISIBLE);
+                virtualCursor.setVisibility(View.VISIBLE);
+                webView.requestFocus();
+            }
+
+            // Feature 3: Multi-Window / OAuth Popups
+            @Override
+            public boolean onCreateWindow(WebView view, boolean isDialog, boolean isUserGesture, Message resultMsg) {
+                openPopupWindow(resultMsg);
+                return true;
+            }
+
+            @Override
+            public void onCloseWindow(WebView window) {
+                closePopupWindow();
+            }
         });
+
+        // Feature 4: File Downloads via Android DownloadManager
+        webView.setDownloadListener(new DownloadListener() {
+            @Override
+            public void onDownloadStart(String url, String userAgent, String contentDisposition, String mimeType, long contentLength) {
+                handleDownload(url, userAgent, contentDisposition, mimeType);
+            }
+        });
+    }
+
+    private void recreateWebView() {
+        if (webView != null) {
+            String currentUrl = (urlEdit != null && urlEdit.getText().length() > 0) ?
+                    urlEdit.getText().toString() : "https://www.google.com";
+
+            ViewGroup parent = (ViewGroup) webView.getParent();
+            if (parent != null) {
+                int index = parent.indexOfChild(webView);
+                parent.removeView(webView);
+                try {
+                    webView.destroy();
+                } catch (Exception ignored) {}
+
+                webView = new WebView(this);
+                webView.setId(R.id.web_view);
+                parent.addView(webView, index, new FrameLayout.LayoutParams(
+                        ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+
+                setupWebView();
+                loadUrl(currentUrl);
+                webView.requestFocus();
+            }
+        }
+    }
+
+    private void openPopupWindow(Message resultMsg) {
+        closePopupWindow();
+        if (popupContainer == null || popupWebviewHolder == null) return;
+
+        popupContainer.setVisibility(View.VISIBLE);
+        popupWebView = new WebView(this);
+        WebSettings popupSettings = popupWebView.getSettings();
+        popupSettings.setJavaScriptEnabled(true);
+        popupSettings.setDomStorageEnabled(true);
+        popupSettings.setDatabaseEnabled(true);
+        popupSettings.setSupportZoom(true);
+        popupSettings.setBuiltInZoomControls(true);
+        popupSettings.setDisplayZoomControls(false);
+        if (webView != null) {
+            popupSettings.setUserAgentString(webView.getSettings().getUserAgentString());
+        }
+
+        popupWebviewHolder.removeAllViews();
+        popupWebviewHolder.addView(popupWebView, new FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+
+        popupWebView.setWebViewClient(new WebViewClient() {
+            @Override
+            public boolean shouldOverrideUrlLoading(WebView view, String url) {
+                return false;
+            }
+        });
+
+        popupWebView.setWebChromeClient(new WebChromeClient() {
+            @Override
+            public void onCloseWindow(WebView window) {
+                closePopupWindow();
+            }
+        });
+
+        if (resultMsg != null && resultMsg.obj instanceof WebView.WebViewTransport) {
+            WebView.WebViewTransport transport = (WebView.WebViewTransport) resultMsg.obj;
+            transport.setWebView(popupWebView);
+            resultMsg.sendToTarget();
+        }
+
+        popupWebView.requestFocus();
+        showHudToast("Popup opened (Back to close)");
+    }
+
+    private void closePopupWindow() {
+        if (popupContainer != null) {
+            popupContainer.setVisibility(View.GONE);
+        }
+        if (popupWebView != null) {
+            if (popupWebviewHolder != null) {
+                popupWebviewHolder.removeAllViews();
+            }
+            try {
+                popupWebView.destroy();
+            } catch (Exception ignored) {}
+            popupWebView = null;
+        }
+        if (webView != null) {
+            webView.requestFocus();
+        }
+    }
+
+    private void handleDownload(String url, String userAgent, String contentDisposition, String mimeType) {
+        try {
+            DownloadManager.Request request = new DownloadManager.Request(Uri.parse(url));
+            if (mimeType != null && !mimeType.isEmpty()) {
+                request.setMimeType(mimeType);
+            }
+            String fileName = URLUtil.guessFileName(url, contentDisposition, mimeType);
+            request.setTitle(fileName);
+            request.setDescription("Downloading file...");
+            request.allowScanningByMediaScanner();
+            request.setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED);
+            request.setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS, fileName);
+
+            DownloadManager dm = (DownloadManager) getSystemService(Context.DOWNLOAD_SERVICE);
+            if (dm != null) {
+                dm.enqueue(request);
+                showHudToast("Downloading " + fileName);
+            }
+        } catch (Exception e) {
+            showHudToast("Download error: " + e.getMessage());
+        }
     }
 
     private void setupBottomBar() {
@@ -761,7 +1035,11 @@ public class MainActivity extends Activity {
     }
 
     private void scrollWeb(int dy) {
-        long now = SystemClock.uptimeMillis();
+        if (popupContainer != null && popupContainer.getVisibility() == View.VISIBLE && popupWebView != null) {
+            popupWebView.evaluateJavascript("window.scrollBy(0, " + dy + ");", null);
+            return;
+        }
+
         boolean insideModal = (activeModalRect != null && activeModalRect.contains(cursorX, cursorY));
 
         float targetX = cursorX;
@@ -775,29 +1053,7 @@ public class MainActivity extends Activity {
             targetY = (safeTop + safeBottom) / 2f;
         }
 
-        // Layer 1: Hardware mouse-wheel generic motion event (discrete, non-flinging, penetrates iframes natively)
-        try {
-            MotionEvent.PointerProperties[] props = new MotionEvent.PointerProperties[1];
-            props[0] = new MotionEvent.PointerProperties();
-            props[0].id = 0;
-            props[0].toolType = MotionEvent.TOOL_TYPE_MOUSE;
-
-            MotionEvent.PointerCoords[] coords = new MotionEvent.PointerCoords[1];
-            coords[0] = new MotionEvent.PointerCoords();
-            coords[0].x = targetX;
-            coords[0].y = targetY;
-            coords[0].setAxisValue(MotionEvent.AXIS_VSCROLL, dy > 0 ? -1.0f : 1.0f);
-
-            MotionEvent scrollEvent = MotionEvent.obtain(
-                now, now, MotionEvent.ACTION_SCROLL, 1, props, coords,
-                0, 0, 1.0f, 1.0f, 0, 0,
-                InputDevice.SOURCE_MOUSE, 0
-            );
-            webView.dispatchGenericMotionEvent(scrollEvent);
-            scrollEvent.recycle();
-        } catch (Exception ignored) {}
-
-        // Layer 2: Deterministic DOM scroll (exact pixel calibration for textareas, sub-containers, and root page)
+        // Single deterministic scroll driver: sub-container if present, otherwise single window.scrollBy
         String js = "(function(cx, cy, dy) {" +
             "  var dpr = window.devicePixelRatio || 1;" +
             "  var el = document.elementFromPoint(cx / dpr, cy / dpr);" +
@@ -811,17 +1067,34 @@ public class MainActivity extends Activity {
             "    }" +
             "    el = el.parentElement;" +
             "  }" +
+            "  var scrolled = false;" +
             "  if (target) {" +
+            "    var oldTop = target.scrollTop;" +
             "    target.scrollTop += dy;" +
-            "  } else {" +
+            "    if (Math.abs(target.scrollTop - oldTop) > 0.5) scrolled = true;" +
+            "  }" +
+            "  if (!scrolled) {" +
             "    window.scrollBy(0, dy);" +
             "  }" +
+            "  var canUp = target ? (target.scrollTop > 2) : (window.scrollY > 2);" +
+            "  var canDown = target ? (target.scrollTop + target.clientHeight < target.scrollHeight - 4) : true;" +
+            "  return JSON.stringify({canUp: canUp, canDown: canDown});" +
             "})(" + targetX + ", " + targetY + ", " + dy + ");";
-        webView.evaluateJavascript(js, null);
 
-        // Immediate check to update container scroll limits
-        lastModalCheckTime = 0;
-        checkActiveModal(cursorX, cursorY);
+        webView.evaluateJavascript(js, new ValueCallback<String>() {
+            @Override
+            public void onReceiveValue(String value) {
+                if (value != null && !value.isEmpty() && !value.equals("null")) {
+                    try {
+                        String clean = value.replace("\\\"", "\"");
+                        if (clean.startsWith("\"") && clean.endsWith("\"")) clean = clean.substring(1, clean.length() - 1);
+                        JSONObject obj = new JSONObject(clean);
+                        containerCanScrollUp = obj.optBoolean("canUp", true);
+                        containerCanScrollDown = obj.optBoolean("canDown", true);
+                    } catch (Exception ignored) {}
+                }
+            }
+        });
     }
 
     private void showBottomBar() {
@@ -1057,6 +1330,25 @@ public class MainActivity extends Activity {
         int keyCode = event.getKeyCode();
         int action = event.getAction();
 
+        // -2. HTML5 Fullscreen Video handling
+        if (customView != null) {
+            if (keyCode == KeyEvent.KEYCODE_BACK && action == KeyEvent.ACTION_DOWN) {
+                if (webView != null && webView.getWebChromeClient() != null) {
+                    webView.getWebChromeClient().onHideCustomView();
+                }
+                return true;
+            }
+            return customView.dispatchKeyEvent(event);
+        }
+
+        // -1. Multi-Window / OAuth Popup handling
+        if (popupContainer != null && popupContainer.getVisibility() == View.VISIBLE) {
+            if (keyCode == KeyEvent.KEYCODE_BACK && action == KeyEvent.ACTION_DOWN) {
+                closePopupWindow();
+                return true;
+            }
+        }
+
         // 0. Exit Dialog handling
         if (exitDialogContainer != null && exitDialogContainer.getVisibility() == View.VISIBLE) {
             if (action == KeyEvent.ACTION_DOWN) {
@@ -1211,24 +1503,24 @@ public class MainActivity extends Activity {
                 switch (keyCode) {
                     case KeyEvent.KEYCODE_DPAD_UP:
                         if (cursorY <= effectiveMinY + 4f) {
-                            boolean canExit = (insideModal && isInsideIframe && edgeScrollTicks >= 20) ||
-                                              (insideModal && !isInsideIframe && !containerCanScrollUp && edgeScrollTicks >= 2);
-                            if (canExit) {
-                                // End of scrolling reached at top of modal: allow cursor to exit modal
-                                activeModalRect = null;
-                                isInsideIframe = false;
-                                cursorY = Math.max(minY, cursorY - step);
-                                updateCursorIcon(R.drawable.cursor_pointer);
-                                edgeScrollTicks = 0;
-                            } else {
-                                edgeScrollTicks++;
-                                if (edgeScrollTicks == 1) {
-                                    // Only switch to scroll icon after the first extra UP scroll
-                                    updateCursorIcon(R.drawable.cursor_scroll_up);
-                                } else if (edgeScrollTicks >= 2) {
-                                    updateCursorIcon(R.drawable.cursor_scroll_up);
-                                    scrollWeb(insideModal ? -75 : -100);
+                            if (insideModal) {
+                                boolean canExitModal = (edgeScrollTicks >= 3) || (!containerCanScrollUp && edgeScrollTicks >= 1);
+                                if (canExitModal) {
+                                    activeModalRect = null;
+                                    isInsideIframe = false;
+                                    cursorY = Math.max(minY, cursorY - step);
+                                    updateCursorIcon(R.drawable.cursor_pointer);
+                                    edgeScrollTicks = 0;
+                                    break;
                                 }
+                            }
+                            edgeScrollTicks++;
+                            if (edgeScrollTicks == 1) {
+                                // Only switch to scroll icon after the first extra UP scroll
+                                updateCursorIcon(R.drawable.cursor_scroll_up);
+                            } else {
+                                updateCursorIcon(R.drawable.cursor_scroll_up);
+                                scrollWeb(insideModal ? -75 : -100);
                             }
                         } else {
                             edgeScrollTicks = 0;
@@ -1240,24 +1532,24 @@ public class MainActivity extends Activity {
 
                     case KeyEvent.KEYCODE_DPAD_DOWN:
                         if (cursorY >= effectiveMaxY - 4f) {
-                            boolean canExit = (insideModal && isInsideIframe && edgeScrollTicks >= 20) ||
-                                              (insideModal && !isInsideIframe && !containerCanScrollDown && edgeScrollTicks >= 2);
-                            if (canExit) {
-                                // End of scrolling reached at bottom of modal: allow cursor to exit modal
-                                activeModalRect = null;
-                                isInsideIframe = false;
-                                cursorY = Math.min(maxY, cursorY + step);
-                                updateCursorIcon(R.drawable.cursor_pointer);
-                                edgeScrollTicks = 0;
-                            } else {
-                                edgeScrollTicks++;
-                                if (edgeScrollTicks == 1) {
-                                    // Only switch to scroll icon after the first extra DOWN scroll
-                                    updateCursorIcon(R.drawable.cursor_scroll_down);
-                                } else if (edgeScrollTicks >= 2) {
-                                    updateCursorIcon(R.drawable.cursor_scroll_down);
-                                    scrollWeb(insideModal ? 75 : 100);
+                            if (insideModal) {
+                                boolean canExitModal = (edgeScrollTicks >= 3) || (!containerCanScrollDown && edgeScrollTicks >= 1);
+                                if (canExitModal) {
+                                    activeModalRect = null;
+                                    isInsideIframe = false;
+                                    cursorY = Math.min(maxY, cursorY + step);
+                                    updateCursorIcon(R.drawable.cursor_pointer);
+                                    edgeScrollTicks = 0;
+                                    break;
                                 }
+                            }
+                            edgeScrollTicks++;
+                            if (edgeScrollTicks == 1) {
+                                // Only switch to scroll icon after the first extra DOWN scroll
+                                updateCursorIcon(R.drawable.cursor_scroll_down);
+                            } else {
+                                updateCursorIcon(R.drawable.cursor_scroll_down);
+                                scrollWeb(insideModal ? 75 : 100);
                             }
                         } else {
                             edgeScrollTicks = 0;
@@ -1312,6 +1604,35 @@ public class MainActivity extends Activity {
                 virtualCursor.animate().scaleX(1.0f).scaleY(1.0f).setDuration(90).start();
             }
         }).start();
+
+        // -1. If Popup is visible, check button and webview clicks
+        if (popupContainer != null && popupContainer.getVisibility() == View.VISIBLE) {
+            if (btnClosePopup != null) {
+                Rect closeRect = new Rect();
+                btnClosePopup.getGlobalVisibleRect(closeRect);
+                if (closeRect.contains((int) x, (int) y)) {
+                    closePopupWindow();
+                    return;
+                }
+            }
+            if (popupWebView != null) {
+                Rect webRect = new Rect();
+                popupWebView.getGlobalVisibleRect(webRect);
+                if (webRect.contains((int) x, (int) y)) {
+                    long downTime = SystemClock.uptimeMillis();
+                    MotionEvent eventDown = MotionEvent.obtain(downTime, downTime, MotionEvent.ACTION_DOWN, x - webRect.left, y - webRect.top, 0);
+                    MotionEvent eventUp = MotionEvent.obtain(downTime, downTime + 35, MotionEvent.ACTION_UP, x - webRect.left, y - webRect.top, 0);
+                    popupWebView.dispatchTouchEvent(eventDown);
+                    popupWebView.dispatchTouchEvent(eventUp);
+                    eventDown.recycle();
+                    eventUp.recycle();
+                    return;
+                }
+            }
+            // Click outside card closes popup
+            closePopupWindow();
+            return;
+        }
 
         // 0. If Exit Dialog is open, check button clicks
         if (exitDialogContainer != null && exitDialogContainer.getVisibility() == View.VISIBLE) {
