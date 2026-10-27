@@ -5,7 +5,6 @@ import android.app.DownloadManager;
 import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
-import android.content.res.ColorStateList;
 import android.graphics.Color;
 import android.graphics.Rect;
 import android.graphics.RectF;
@@ -16,11 +15,9 @@ import android.os.Bundle;
 import android.os.Environment;
 import android.os.Handler;
 import android.os.Looper;
-import android.os.Message;
 import android.os.SystemClock;
 import android.util.DisplayMetrics;
 import android.view.Gravity;
-import android.view.InputDevice;
 import android.view.KeyEvent;
 import android.view.MotionEvent;
 import android.view.View;
@@ -71,7 +68,14 @@ public class MainActivity extends Activity {
     private ImageButton btnRefresh;
     private ImageButton btnGo;
     private Button btnBookmarks;
-    private ImageButton btnDebug;
+    private View[] navButtons;
+    private final Rect clickRect = new Rect();
+
+    // Unified 60px / 20px Grid Constants
+    private static final float CURSOR_SIZE_PX = 60f;
+    private static final float CURSOR_HALF_PX = 30f;
+    private static final float CURSOR_STEP_PX = 20f;
+    private static final float CURSOR_REPEAT_STEP_PX = 40f;
 
     // Diagnostics Debug Layer
     private boolean isDebugVisible = false;
@@ -190,11 +194,6 @@ public class MainActivity extends Activity {
     private void initViews() {
         webView = findViewById(R.id.web_view);
         pageProgress = findViewById(R.id.page_progress);
-        if (pageProgress != null) {
-            ColorStateList blueTint = ColorStateList.valueOf(Color.parseColor("#2979FF"));
-            pageProgress.setProgressTintList(blueTint);
-            pageProgress.setIndeterminateTintList(blueTint);
-        }
         bottomBar = findViewById(R.id.bottom_bar);
         bookmarksPanel = findViewById(R.id.bookmarks_panel);
         bookmarksRow1 = findViewById(R.id.bookmarks_row1);
@@ -207,10 +206,11 @@ public class MainActivity extends Activity {
         btnForward = findViewById(R.id.btn_forward);
         btnRefresh = findViewById(R.id.btn_refresh);
         btnGo = findViewById(R.id.btn_go);
-        btnDebug = findViewById(R.id.btn_debug);
         btnBookmarks = findViewById(R.id.btn_bookmarks);
         virtualCursor = findViewById(R.id.virtual_cursor);
         hudToast = findViewById(R.id.hud_toast);
+
+        navButtons = new View[]{btnExit, btnBack, btnForward, btnRefresh, btnClear, btnGo, btnBookmarks};
 
         debugGridView = findViewById(R.id.debug_grid_view);
         debugHudPanel = findViewById(R.id.debug_hud_panel);
@@ -246,26 +246,6 @@ public class MainActivity extends Activity {
                     }
                 }
             });
-            btnBookmarkClearTitle.setOnKeyListener(new View.OnKeyListener() {
-                @Override
-                public boolean onKey(View v, int keyCode, KeyEvent event) {
-                    if (event.getAction() == KeyEvent.ACTION_DOWN) {
-                        if (keyCode == KeyEvent.KEYCODE_DPAD_LEFT) {
-                            if (editBookmarkTitle != null) editBookmarkTitle.requestFocus();
-                            return true;
-                        }
-                        if (keyCode == KeyEvent.KEYCODE_DPAD_DOWN) {
-                            if (btnBookmarkClearUrl != null) {
-                                btnBookmarkClearUrl.requestFocus();
-                            } else if (editBookmarkUrl != null) {
-                                editBookmarkUrl.requestFocus();
-                            }
-                            return true;
-                        }
-                    }
-                    return false;
-                }
-            });
         }
 
         if (btnBookmarkClearUrl != null) {
@@ -276,34 +256,6 @@ public class MainActivity extends Activity {
                         editBookmarkUrl.setText("");
                         editBookmarkUrl.requestFocus();
                     }
-                }
-            });
-            btnBookmarkClearUrl.setOnKeyListener(new View.OnKeyListener() {
-                @Override
-                public boolean onKey(View v, int keyCode, KeyEvent event) {
-                    if (event.getAction() == KeyEvent.ACTION_DOWN) {
-                        if (keyCode == KeyEvent.KEYCODE_DPAD_LEFT) {
-                            if (editBookmarkUrl != null) editBookmarkUrl.requestFocus();
-                            return true;
-                        }
-                        if (keyCode == KeyEvent.KEYCODE_DPAD_UP) {
-                            if (btnBookmarkClearTitle != null) {
-                                btnBookmarkClearTitle.requestFocus();
-                            } else if (editBookmarkTitle != null) {
-                                editBookmarkTitle.requestFocus();
-                            }
-                            return true;
-                        }
-                        if (keyCode == KeyEvent.KEYCODE_DPAD_DOWN) {
-                            if (btnBookmarkSave != null && btnBookmarkSave.getVisibility() == View.VISIBLE) {
-                                btnBookmarkSave.requestFocus();
-                            } else if (btnBookmarkCancel != null) {
-                                btnBookmarkCancel.requestFocus();
-                            }
-                            return true;
-                        }
-                    }
-                    return false;
                 }
             });
         }
@@ -333,55 +285,6 @@ public class MainActivity extends Activity {
             });
         }
 
-        if (editBookmarkTitle != null) {
-            editBookmarkTitle.setOnKeyListener(new View.OnKeyListener() {
-                @Override
-                public boolean onKey(View v, int keyCode, KeyEvent event) {
-                    if (event.getAction() == KeyEvent.ACTION_DOWN) {
-                        if (keyCode == KeyEvent.KEYCODE_DPAD_RIGHT) {
-                            if (btnBookmarkClearTitle != null) {
-                                btnBookmarkClearTitle.requestFocus();
-                                return true;
-                            }
-                        }
-                        if (keyCode == KeyEvent.KEYCODE_DPAD_DOWN) {
-                            if (editBookmarkUrl != null) editBookmarkUrl.requestFocus();
-                            return true;
-                        }
-                    }
-                    return false;
-                }
-            });
-        }
-        if (editBookmarkUrl != null) {
-            editBookmarkUrl.setOnKeyListener(new View.OnKeyListener() {
-                @Override
-                public boolean onKey(View v, int keyCode, KeyEvent event) {
-                    if (event.getAction() == KeyEvent.ACTION_DOWN) {
-                        if (keyCode == KeyEvent.KEYCODE_DPAD_RIGHT) {
-                            if (btnBookmarkClearUrl != null) {
-                                btnBookmarkClearUrl.requestFocus();
-                                return true;
-                            }
-                        }
-                        if (keyCode == KeyEvent.KEYCODE_DPAD_UP) {
-                            if (editBookmarkTitle != null) editBookmarkTitle.requestFocus();
-                            return true;
-                        }
-                        if (keyCode == KeyEvent.KEYCODE_DPAD_DOWN) {
-                            if (btnBookmarkSave != null && btnBookmarkSave.getVisibility() == View.VISIBLE) {
-                                btnBookmarkSave.requestFocus();
-                            } else if (btnBookmarkCancel != null) {
-                                btnBookmarkCancel.requestFocus();
-                            }
-                            return true;
-                        }
-                    }
-                    return false;
-                }
-            });
-        }
-
         View.OnFocusChangeListener dialogInputFocusListener = new View.OnFocusChangeListener() {
             @Override
             public void onFocusChange(View v, boolean hasFocus) {
@@ -407,67 +310,8 @@ public class MainActivity extends Activity {
         if (editBookmarkUrl != null) {
             editBookmarkUrl.setOnFocusChangeListener(dialogInputFocusListener);
         }
-        if (btnBookmarkDelete != null) {
-            btnBookmarkDelete.setOnKeyListener(new View.OnKeyListener() {
-                @Override
-                public boolean onKey(View v, int keyCode, KeyEvent event) {
-                    if (event.getAction() == KeyEvent.ACTION_DOWN) {
-                        if (keyCode == KeyEvent.KEYCODE_DPAD_UP) {
-                            if (editBookmarkUrl != null) editBookmarkUrl.requestFocus();
-                            return true;
-                        }
-                        if (keyCode == KeyEvent.KEYCODE_DPAD_RIGHT) {
-                            if (btnBookmarkCancel != null) btnBookmarkCancel.requestFocus();
-                            return true;
-                        }
-                    }
-                    return false;
-                }
-            });
-        }
-        if (btnBookmarkCancel != null) {
-            btnBookmarkCancel.setOnKeyListener(new View.OnKeyListener() {
-                @Override
-                public boolean onKey(View v, int keyCode, KeyEvent event) {
-                    if (event.getAction() == KeyEvent.ACTION_DOWN) {
-                        if (keyCode == KeyEvent.KEYCODE_DPAD_UP) {
-                            if (editBookmarkUrl != null) editBookmarkUrl.requestFocus();
-                            return true;
-                        }
-                        if (keyCode == KeyEvent.KEYCODE_DPAD_LEFT) {
-                            if (btnBookmarkDelete != null) btnBookmarkDelete.requestFocus();
-                            return true;
-                        }
-                        if (keyCode == KeyEvent.KEYCODE_DPAD_RIGHT) {
-                            if (btnBookmarkSave != null) btnBookmarkSave.requestFocus();
-                            return true;
-                        }
-                    }
-                    return false;
-                }
-            });
-        }
-        if (btnBookmarkSave != null) {
-            btnBookmarkSave.setOnKeyListener(new View.OnKeyListener() {
-                @Override
-                public boolean onKey(View v, int keyCode, KeyEvent event) {
-                    if (event.getAction() == KeyEvent.ACTION_DOWN) {
-                        if (keyCode == KeyEvent.KEYCODE_DPAD_UP) {
-                            if (editBookmarkUrl != null) editBookmarkUrl.requestFocus();
-                            return true;
-                        }
-                        if (keyCode == KeyEvent.KEYCODE_DPAD_LEFT) {
-                            if (btnBookmarkCancel != null) btnBookmarkCancel.requestFocus();
-                            return true;
-                        }
-                    }
-                    return false;
-                }
-            });
-        }
 
-        virtualCursor.setX(cursorX);
-        virtualCursor.setY(cursorY);
+        updateCursorPosition();
 
         hideBarRunnable = new Runnable() {
             @Override
@@ -1011,23 +855,6 @@ public class MainActivity extends Activity {
             }
         });
 
-        btnExit.setOnKeyListener(new View.OnKeyListener() {
-            @Override
-            public boolean onKey(View v, int keyCode, KeyEvent event) {
-                if (event.getAction() == KeyEvent.ACTION_DOWN) {
-                    if (keyCode == KeyEvent.KEYCODE_DPAD_RIGHT) {
-                        btnBack.requestFocus();
-                        return true;
-                    }
-                    if (keyCode == KeyEvent.KEYCODE_DPAD_UP || keyCode == KeyEvent.KEYCODE_DPAD_DOWN) {
-                        exitNavBarMode();
-                        return true;
-                    }
-                }
-                return false;
-            }
-        });
-
         btnBack.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
@@ -1036,27 +863,6 @@ public class MainActivity extends Activity {
                 virtualCursor.setVisibility(View.GONE);
                 showBottomBar();
                 btnBack.requestFocus();
-            }
-        });
-
-        btnBack.setOnKeyListener(new View.OnKeyListener() {
-            @Override
-            public boolean onKey(View v, int keyCode, KeyEvent event) {
-                if (event.getAction() == KeyEvent.ACTION_DOWN) {
-                    if (keyCode == KeyEvent.KEYCODE_DPAD_LEFT) {
-                        btnExit.requestFocus();
-                        return true;
-                    }
-                    if (keyCode == KeyEvent.KEYCODE_DPAD_RIGHT) {
-                        btnForward.requestFocus();
-                        return true;
-                    }
-                    if (keyCode == KeyEvent.KEYCODE_DPAD_UP || keyCode == KeyEvent.KEYCODE_DPAD_DOWN) {
-                        exitNavBarMode();
-                        return true;
-                    }
-                }
-                return false;
             }
         });
 
@@ -1071,27 +877,6 @@ public class MainActivity extends Activity {
             }
         });
 
-        btnForward.setOnKeyListener(new View.OnKeyListener() {
-            @Override
-            public boolean onKey(View v, int keyCode, KeyEvent event) {
-                if (event.getAction() == KeyEvent.ACTION_DOWN) {
-                    if (keyCode == KeyEvent.KEYCODE_DPAD_LEFT) {
-                        btnBack.requestFocus();
-                        return true;
-                    }
-                    if (keyCode == KeyEvent.KEYCODE_DPAD_RIGHT) {
-                        btnRefresh.requestFocus();
-                        return true;
-                    }
-                    if (keyCode == KeyEvent.KEYCODE_DPAD_UP || keyCode == KeyEvent.KEYCODE_DPAD_DOWN) {
-                        exitNavBarMode();
-                        return true;
-                    }
-                }
-                return false;
-            }
-        });
-
         btnRefresh.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
@@ -1103,27 +888,6 @@ public class MainActivity extends Activity {
             }
         });
 
-        btnRefresh.setOnKeyListener(new View.OnKeyListener() {
-            @Override
-            public boolean onKey(View v, int keyCode, KeyEvent event) {
-                if (event.getAction() == KeyEvent.ACTION_DOWN) {
-                    if (keyCode == KeyEvent.KEYCODE_DPAD_LEFT) {
-                        btnForward.requestFocus();
-                        return true;
-                    }
-                    if (keyCode == KeyEvent.KEYCODE_DPAD_RIGHT) {
-                        urlEdit.requestFocus();
-                        return true;
-                    }
-                    if (keyCode == KeyEvent.KEYCODE_DPAD_UP || keyCode == KeyEvent.KEYCODE_DPAD_DOWN) {
-                        exitNavBarMode();
-                        return true;
-                    }
-                }
-                return false;
-            }
-        });
-
         btnGo.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
@@ -1131,83 +895,11 @@ public class MainActivity extends Activity {
             }
         });
 
-        btnGo.setOnKeyListener(new View.OnKeyListener() {
-            @Override
-            public boolean onKey(View v, int keyCode, KeyEvent event) {
-                if (event.getAction() == KeyEvent.ACTION_DOWN) {
-                    if (keyCode == KeyEvent.KEYCODE_DPAD_LEFT) {
-                        btnClear.requestFocus();
-                        return true;
-                    }
-                    if (keyCode == KeyEvent.KEYCODE_DPAD_RIGHT) {
-                        if (btnDebug != null) btnDebug.requestFocus();
-                        else btnBookmarks.requestFocus();
-                        return true;
-                    }
-                    if (keyCode == KeyEvent.KEYCODE_DPAD_UP || keyCode == KeyEvent.KEYCODE_DPAD_DOWN) {
-                        exitNavBarMode();
-                        return true;
-                    }
-                }
-                return false;
-            }
-        });
-
-        if (btnDebug != null) {
-            btnDebug.setOnClickListener(new View.OnClickListener() {
-                @Override
-                public void onClick(View v) {
-                    toggleDebugOverlay();
-                }
-            });
-            btnDebug.setOnKeyListener(new View.OnKeyListener() {
-                @Override
-                public boolean onKey(View v, int keyCode, KeyEvent event) {
-                    if (event.getAction() == KeyEvent.ACTION_DOWN) {
-                        if (keyCode == KeyEvent.KEYCODE_DPAD_LEFT) {
-                            btnGo.requestFocus();
-                            return true;
-                        }
-                        if (keyCode == KeyEvent.KEYCODE_DPAD_RIGHT) {
-                            btnBookmarks.requestFocus();
-                            return true;
-                        }
-                        if (keyCode == KeyEvent.KEYCODE_DPAD_UP || keyCode == KeyEvent.KEYCODE_DPAD_DOWN) {
-                            exitNavBarMode();
-                            return true;
-                        }
-                    }
-                    return false;
-                }
-            });
-        }
-
         btnClear.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
                 urlEdit.setText("");
                 urlEdit.requestFocus();
-            }
-        });
-
-        btnClear.setOnKeyListener(new View.OnKeyListener() {
-            @Override
-            public boolean onKey(View v, int keyCode, KeyEvent event) {
-                if (event.getAction() == KeyEvent.ACTION_DOWN) {
-                    if (keyCode == KeyEvent.KEYCODE_DPAD_LEFT) {
-                        urlEdit.requestFocus();
-                        return true;
-                    }
-                    if (keyCode == KeyEvent.KEYCODE_DPAD_RIGHT) {
-                        btnGo.requestFocus();
-                        return true;
-                    }
-                    if (keyCode == KeyEvent.KEYCODE_DPAD_UP || keyCode == KeyEvent.KEYCODE_DPAD_DOWN) {
-                        exitNavBarMode();
-                        return true;
-                    }
-                }
-                return false;
             }
         });
 
@@ -1244,27 +936,10 @@ public class MainActivity extends Activity {
             }
         });
 
-        // Fast D-pad navigation across URL edit
         urlEdit.setOnKeyListener(new View.OnKeyListener() {
             @Override
             public boolean onKey(View v, int keyCode, KeyEvent event) {
                 if (event.getAction() == KeyEvent.ACTION_DOWN) {
-                    if (keyCode == KeyEvent.KEYCODE_DPAD_LEFT) {
-                        btnRefresh.requestFocus();
-                        return true;
-                    }
-                    if (keyCode == KeyEvent.KEYCODE_DPAD_RIGHT) {
-                        btnClear.requestFocus();
-                        return true;
-                    }
-                    if (keyCode == KeyEvent.KEYCODE_DPAD_UP || keyCode == KeyEvent.KEYCODE_DPAD_DOWN) {
-                        if (isSearchingAtTop) {
-                            exitSearchMode();
-                        } else {
-                            exitNavBarMode();
-                        }
-                        return true;
-                    }
                     if (keyCode == KeyEvent.KEYCODE_DPAD_CENTER || keyCode == KeyEvent.KEYCODE_ENTER) {
                         enterSearchMode();
                         return true;
@@ -1289,11 +964,6 @@ public class MainActivity extends Activity {
             @Override
             public boolean onKey(View v, int keyCode, KeyEvent event) {
                 if (event.getAction() == KeyEvent.ACTION_DOWN) {
-                    if (keyCode == KeyEvent.KEYCODE_DPAD_LEFT) {
-                        if (btnDebug != null) btnDebug.requestFocus();
-                        else btnGo.requestFocus();
-                        return true;
-                    }
                     if (keyCode == KeyEvent.KEYCODE_DPAD_UP) {
                         if (bookmarksPanel != null && bookmarksPanel.getVisibility() == View.VISIBLE) {
                             if (bookmarksRow2.getChildCount() > 0) {
@@ -1305,15 +975,6 @@ public class MainActivity extends Activity {
                             }
                             return true;
                         }
-                        exitNavBarMode();
-                        return true;
-                    }
-                    if (keyCode == KeyEvent.KEYCODE_DPAD_DOWN) {
-                        if (bookmarksPanel != null && bookmarksPanel.getVisibility() == View.VISIBLE) {
-                            closeBookmarksDrawer();
-                        }
-                        exitNavBarMode();
-                        return true;
                     }
                 }
                 return false;
@@ -1328,44 +989,10 @@ public class MainActivity extends Activity {
             }
         });
 
-        btnExitConfirm.setOnKeyListener(new View.OnKeyListener() {
-            @Override
-            public boolean onKey(View v, int keyCode, KeyEvent event) {
-                if (event.getAction() == KeyEvent.ACTION_DOWN) {
-                    if (keyCode == KeyEvent.KEYCODE_DPAD_RIGHT) {
-                        btnExitCancel.requestFocus();
-                        return true;
-                    }
-                    if (keyCode == KeyEvent.KEYCODE_BACK) {
-                        hideExitDialog();
-                        return true;
-                    }
-                }
-                return false;
-            }
-        });
-
         btnExitCancel.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
                 hideExitDialog();
-            }
-        });
-
-        btnExitCancel.setOnKeyListener(new View.OnKeyListener() {
-            @Override
-            public boolean onKey(View v, int keyCode, KeyEvent event) {
-                if (event.getAction() == KeyEvent.ACTION_DOWN) {
-                    if (keyCode == KeyEvent.KEYCODE_DPAD_LEFT) {
-                        btnExitConfirm.requestFocus();
-                        return true;
-                    }
-                    if (keyCode == KeyEvent.KEYCODE_BACK) {
-                        hideExitDialog();
-                        return true;
-                    }
-                }
-                return false;
             }
         });
     }
@@ -1425,6 +1052,20 @@ public class MainActivity extends Activity {
         updateCursorIcon(R.drawable.cursor_pointer);
     }
 
+    private void updateCursorPosition() {
+        if (virtualCursor != null) {
+            virtualCursor.setX(cursorX - CURSOR_HALF_PX);
+            virtualCursor.setY(cursorY - CURSOR_HALF_PX);
+        }
+        if (isDebugVisible) {
+            if (debugGridView != null) debugGridView.setCursorPos(cursorX, cursorY, activeModalRect);
+            if (debugTextCursor != null) {
+                String modeStr = isNavBarMode ? "Nav Bar" : (isSearchingAtTop ? "Search" : "Content");
+                debugTextCursor.setText("CURSOR: (" + (int) cursorX + ", " + (int) cursorY + ") | Mode: " + modeStr);
+            }
+        }
+    }
+
     private void updateCursorIcon(int resId) {
         if (currentCursorResId != resId) {
             currentCursorResId = resId;
@@ -1464,7 +1105,7 @@ public class MainActivity extends Activity {
         handler.removeCallbacks(hideBarRunnable);
         bookmarksPanel.setVisibility(View.GONE);
 
-        float targetY = -(screenHeight - dpToPx(58) - dpToPx(48));
+        float targetY = -(screenHeight - dpToPx(60) - dpToPx(48));
         bottomBar.animate().translationY(targetY).alpha(1f).setDuration(240).start();
     }
 
@@ -1647,7 +1288,6 @@ public class MainActivity extends Activity {
                         containerCanScrollUp = obj.optBoolean("canUp", true);
                         containerCanScrollDown = obj.optBoolean("canDown", true);
                         boolean scrolled = obj.optBoolean("scrolled", false);
-                        android.util.Log.e("CathodeScroll", "scrolled=" + scrolled + " json=" + clean);
                         if (!scrolled) {
                             webView.scrollBy(dx, dy);
                         }
@@ -1661,7 +1301,7 @@ public class MainActivity extends Activity {
         isBarVisible = true;
         handler.removeCallbacks(hideBarRunnable);
         if (isSearchingAtTop) {
-            float targetY = -(screenHeight - dpToPx(58) - dpToPx(48));
+            float targetY = -(screenHeight - dpToPx(60) - dpToPx(48));
             bottomBar.animate().translationY(targetY).alpha(1f).setDuration(200).start();
         } else {
             bottomBar.animate().translationY(0f).alpha(1f).setDuration(200).start();
@@ -1771,7 +1411,7 @@ public class MainActivity extends Activity {
         btnAdd.setCompoundDrawablesWithIntrinsicBounds(R.drawable.dot_yellow, 0, 0, 0);
         btnAdd.setCompoundDrawablePadding(dpToPx(8));
         LinearLayout.LayoutParams lpAdd = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, dpToPx(40));
-        lpAdd.setMarginEnd(dpToPx(8));
+        lpAdd.setMarginEnd(dpToPx(10));
         btnAdd.setLayoutParams(lpAdd);
         btnAdd.setPadding(dpToPx(16), 0, dpToPx(16), 0);
         btnAdd.setOnClickListener(new View.OnClickListener() {
@@ -1836,7 +1476,7 @@ public class MainActivity extends Activity {
                 chip.setFocusable(true);
                 chip.setTag(i);
                 LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, dpToPx(40));
-                lp.setMarginEnd(dpToPx(8));
+                lp.setMarginEnd(dpToPx(10));
                 chip.setLayoutParams(lp);
                 chip.setPadding(dpToPx(16), 0, dpToPx(16), 0);
 
@@ -2110,12 +1750,11 @@ public class MainActivity extends Activity {
             keyCode == KeyEvent.KEYCODE_DPAD_RIGHT) {
 
             if (action == KeyEvent.ACTION_DOWN) {
-                float step = (event.getRepeatCount() > 2) ? 44f : 22f;
-                float cursorSize = dpToPx(26);
-                float minX = dpToPx(8);
-                float maxX = screenWidth - cursorSize - dpToPx(8);
-                float minY = dpToPx(8);
-                float maxY = screenHeight - cursorSize - dpToPx(8);
+                float step = (event.getRepeatCount() > 2) ? CURSOR_REPEAT_STEP_PX : CURSOR_STEP_PX;
+                float minX = 0f;
+                float maxX = (float) screenWidth;
+                float minY = 0f;
+                float maxY = (float) screenHeight;
 
                 // Check if cursor is currently within an active modal / popup / scrollable container
                 final boolean insideModal;
@@ -2223,14 +1862,7 @@ public class MainActivity extends Activity {
                         }
                         break;
                 }
-                virtualCursor.setX(cursorX);
-                virtualCursor.setY(cursorY);
-                if (isDebugVisible) {
-                    if (debugGridView != null) debugGridView.setCursorPos(cursorX, cursorY, activeModalRect);
-                    if (debugTextCursor != null) {
-                        debugTextCursor.setText("CURSOR: (" + (int) cursorX + ", " + (int) cursorY + ") | Mode: Content");
-                    }
-                }
+                updateCursorPosition();
                 checkActiveModal(cursorX, cursorY);
             }
             return true;
@@ -2255,28 +1887,28 @@ public class MainActivity extends Activity {
             }
         }).start();
 
+        final int ix = (int) x;
+        final int iy = (int) y;
+
         // -1. If Bookmark Edit Dialog is open, check button clicks
         if (bookmarkDialogContainer != null && bookmarkDialogContainer.getVisibility() == View.VISIBLE) {
             if (btnBookmarkSave != null) {
-                Rect saveRect = new Rect();
-                btnBookmarkSave.getGlobalVisibleRect(saveRect);
-                if (saveRect.contains((int) x, (int) y)) {
+                btnBookmarkSave.getGlobalVisibleRect(clickRect);
+                if (clickRect.contains(ix, iy)) {
                     btnBookmarkSave.performClick();
                     return;
                 }
             }
             if (btnBookmarkDelete != null) {
-                Rect deleteRect = new Rect();
-                btnBookmarkDelete.getGlobalVisibleRect(deleteRect);
-                if (deleteRect.contains((int) x, (int) y)) {
+                btnBookmarkDelete.getGlobalVisibleRect(clickRect);
+                if (clickRect.contains(ix, iy)) {
                     btnBookmarkDelete.performClick();
                     return;
                 }
             }
             if (btnBookmarkCancel != null) {
-                Rect cancelRect = new Rect();
-                btnBookmarkCancel.getGlobalVisibleRect(cancelRect);
-                if (cancelRect.contains((int) x, (int) y)) {
+                btnBookmarkCancel.getGlobalVisibleRect(clickRect);
+                if (clickRect.contains(ix, iy)) {
                     btnBookmarkCancel.performClick();
                     return;
                 }
@@ -2288,42 +1920,45 @@ public class MainActivity extends Activity {
 
         // 0. If Exit Dialog is open, check button clicks
         if (exitDialogContainer != null && exitDialogContainer.getVisibility() == View.VISIBLE) {
-            Rect confirmRect = new Rect();
-            btnExitConfirm.getGlobalVisibleRect(confirmRect);
-            if (confirmRect.contains((int) x, (int) y)) {
-                btnExitConfirm.performClick();
-                return;
+            if (btnExitConfirm != null) {
+                btnExitConfirm.getGlobalVisibleRect(clickRect);
+                if (clickRect.contains(ix, iy)) {
+                    btnExitConfirm.performClick();
+                    return;
+                }
             }
-            Rect cancelRect = new Rect();
-            btnExitCancel.getGlobalVisibleRect(cancelRect);
-            if (cancelRect.contains((int) x, (int) y)) {
-                btnExitCancel.performClick();
-                return;
+            if (btnExitCancel != null) {
+                btnExitCancel.getGlobalVisibleRect(clickRect);
+                if (clickRect.contains(ix, iy)) {
+                    btnExitCancel.performClick();
+                    return;
+                }
             }
             return;
         }
 
         // 1. If Bookmarks Panel is open, check bookmark clicks
-        if (bookmarksPanel.getVisibility() == View.VISIBLE) {
-            Rect panelRect = new Rect();
-            bookmarksPanel.getGlobalVisibleRect(panelRect);
-            if (panelRect.contains((int) x, (int) y)) {
-                for (int i = 0; i < bookmarksRow1.getChildCount(); i++) {
-                    View child = bookmarksRow1.getChildAt(i);
-                    Rect r = new Rect();
-                    child.getGlobalVisibleRect(r);
-                    if (r.contains((int) x, (int) y)) {
-                        child.performClick();
-                        return;
+        if (bookmarksPanel != null && bookmarksPanel.getVisibility() == View.VISIBLE) {
+            bookmarksPanel.getGlobalVisibleRect(clickRect);
+            if (clickRect.contains(ix, iy)) {
+                if (bookmarksRow1 != null) {
+                    for (int i = 0; i < bookmarksRow1.getChildCount(); i++) {
+                        View child = bookmarksRow1.getChildAt(i);
+                        child.getGlobalVisibleRect(clickRect);
+                        if (clickRect.contains(ix, iy)) {
+                            child.performClick();
+                            return;
+                        }
                     }
                 }
-                for (int i = 0; i < bookmarksRow2.getChildCount(); i++) {
-                    View child = bookmarksRow2.getChildAt(i);
-                    Rect r = new Rect();
-                    child.getGlobalVisibleRect(r);
-                    if (r.contains((int) x, (int) y)) {
-                        child.performClick();
-                        return;
+                if (bookmarksRow2 != null) {
+                    for (int i = 0; i < bookmarksRow2.getChildCount(); i++) {
+                        View child = bookmarksRow2.getChildAt(i);
+                        child.getGlobalVisibleRect(clickRect);
+                        if (clickRect.contains(ix, iy)) {
+                            child.performClick();
+                            return;
+                        }
                     }
                 }
                 return;
@@ -2331,32 +1966,34 @@ public class MainActivity extends Activity {
         }
 
         // 2. If Bottom Bar is visible, check button clicks
-        if (isBarVisible) {
-            Rect barRect = new Rect();
-            bottomBar.getGlobalVisibleRect(barRect);
-            if (barRect.contains((int) x, (int) y)) {
-                View[] buttons = new View[]{btnExit, btnBack, btnForward, btnRefresh, btnClear, btnGo, btnBookmarks};
-                for (View btn : buttons) {
-                    Rect r = new Rect();
-                    btn.getGlobalVisibleRect(r);
-                    if (r.contains((int) x, (int) y)) {
-                        btn.performClick();
-                        return;
+        if (isBarVisible && bottomBar != null) {
+            bottomBar.getGlobalVisibleRect(clickRect);
+            if (clickRect.contains(ix, iy)) {
+                if (navButtons != null) {
+                    for (View btn : navButtons) {
+                        if (btn != null && btn.getVisibility() == View.VISIBLE) {
+                            btn.getGlobalVisibleRect(clickRect);
+                            if (clickRect.contains(ix, iy)) {
+                                btn.performClick();
+                                return;
+                            }
+                        }
                     }
                 }
-                Rect urlRect = new Rect();
-                urlEdit.getGlobalVisibleRect(urlRect);
-                if (urlRect.contains((int) x, (int) y)) {
-                    enterSearchMode();
-                    return;
+                if (urlEdit != null) {
+                    urlEdit.getGlobalVisibleRect(clickRect);
+                    if (clickRect.contains(ix, iy)) {
+                        enterSearchMode();
+                        return;
+                    }
                 }
                 return;
             }
         }
 
         // Otherwise hide bottom bar/bookmarks if open and click web page
-        if (bookmarksPanel.getVisibility() == View.VISIBLE || isBarVisible) {
-            bookmarksPanel.setVisibility(View.GONE);
+        if ((bookmarksPanel != null && bookmarksPanel.getVisibility() == View.VISIBLE) || isBarVisible) {
+            if (bookmarksPanel != null) bookmarksPanel.setVisibility(View.GONE);
             hideBottomBar();
         }
 

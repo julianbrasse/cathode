@@ -1,14 +1,59 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <!-- Background and Glass Surfaces -->
     <color name="bg_dark">#0A0A0C</color>
-    <color name="bar_glass">#E618181C</color>
+    <color name="bar_glass">#F2101116</color>
     <color name="bar_border">#33FFFFFF</color>
-    <color name="text_primary">#F3F4F6</color>
-    <color name="text_muted">#9CA3AF</color>
-    <color name="accent">#3B82F6</color>
-    <color name="accent_focused">#60A5FA</color>
-    <color name="btn_bg">#25252B</color>
-    <color name="btn_focused">#FFFFFF</color>
-    <color name="btn_text_focused">#000000</color>
+    <color name="surface_card">#1A1B22</color>
+    <color name="surface_card_border">#33FFFFFF</color>
+    <color name="modal_scrim">#CC0A0B10</color>
+    <color name="divider_subtle">#20FFFFFF</color>
+
+    <!-- Typography -->
+    <color name="text_primary">#FFFFFF</color>
+    <color name="text_secondary">#E2E8F0</color>
+    <color name="text_muted">#94A3B8</color>
+    <color name="text_dark">#000000</color>
+
+    <!-- Brand and Accent Blue -->
+    <color name="accent">#2563EB</color>
+    <color name="accent_focused">#3B82F6</color>
+    <color name="accent_pressed">#1D4ED8</color>
+    <color name="accent_glow">#332563EB</color>
+    <color name="scrollbar_blue">#2979FF</color>
+    <color name="progress_bg">#202979FF</color>
+
+    <!-- Interactive Button Surfaces -->
+    <color name="btn_bg">#22232B</color>
+    <color name="btn_border">#353644</color>
+    <color name="btn_focused">#2563EB</color>
+    <color name="btn_focused_border">#FFFFFF</color>
+    <color name="btn_pressed">#1D4ED8</color>
+    <color name="btn_text_focused">#FFFFFF</color>
+
+    <!-- Search Input -->
+    <color name="search_bg">#1A1B22</color>
+    <color name="search_bg_active">#282936</color>
+    <color name="search_border">#353644</color>
+
+    <!-- Semantic Status -->
+    <color name="status_success">#00E676</color>
+    <color name="status_success_bg">#2000E676</color>
+    <color name="status_warning">#EAB308</color>
+    <color name="status_warning_bg">#20EAB308</color>
+    <color name="status_danger">#DC2626</color>
+    <color name="status_danger_bg">#381E1E</color>
+    <color name="status_danger_border">#EF4444</color>
+    <color name="status_danger_pressed">#991B1B</color>
+
+    <!-- Diagnostics and Debug Overlay -->
+    <color name="debug_cyan">#00E5FF</color>
+    <color name="debug_grid_minor">#182979FF</color>
+    <color name="debug_grid_major">#382979FF</color>
+    <color name="debug_crosshair">#6000E5FF</color>
+
+    <!-- Utility -->
     <color name="transparent">#00000000</color>
+    <color name="white">#FFFFFF</color>
+    <color name="black">#000000</color>
 </resources>

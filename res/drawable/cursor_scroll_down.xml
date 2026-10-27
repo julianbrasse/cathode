@@ -1,14 +1,14 @@
 <?xml version="1.0" encoding="utf-8"?>
 <layer-list xmlns:android="http://schemas.android.com/apk/res/android">
-    <!-- Outer black ring shadow for contrast on white sites (exact match to cursor_pointer) -->
+    <!-- Outer black ring shadow for contrast on white sites (60px x 60px) -->
     <item>
         <shape android:shape="oval">
-            <size android:width="26dp" android:height="26dp" />
+            <size android:width="30dp" android:height="30dp" />
             <stroke android:width="3dp" android:color="#99000000" />
         </shape>
     </item>
-    <!-- Sharp white ring (exact match to cursor_pointer) -->
-    <item android:top="2dp" android:left="2dp" android:right="2dp" android:bottom="2dp">
+    <!-- Sharp white ring -->
+    <item android:top="2.5dp" android:left="2.5dp" android:right="2.5dp" android:bottom="2.5dp">
         <shape android:shape="oval">
             <stroke android:width="2.5dp" android:color="#FFFFFF" />
             <solid android:color="#33FFFFFF" />
@@ -16,9 +16,9 @@
     </item>
     <!-- High-contrast down arrow (perfectly centered) -->
     <item
-        android:top="6dp"
-        android:bottom="6dp"
-        android:left="6dp"
-        android:right="6dp"
+        android:top="7dp"
+        android:bottom="7dp"
+        android:left="7dp"
+        android:right="7dp"
         android:drawable="@drawable/ic_arrow_down_reticle" />
 </layer-list>

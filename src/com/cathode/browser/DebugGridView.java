@@ -10,7 +10,7 @@ import android.view.View;
 
 /**
  * High-performance debug overlay view.
- * Renders the virtual cursor grid, coordinate crosshairs,
+ * Renders the 60px x 60px virtual cursor grid, coordinate crosshairs,
  * and container bounding boxes with zero CPU overhead when hidden.
  */
 public class DebugGridView extends View {
@@ -43,7 +43,7 @@ public class DebugGridView extends View {
     }
 
     private void init() {
-        minorGridPaint.setColor(0x182979FF); // Very faint blue
+        minorGridPaint.setColor(0x182979FF); // Very faint websafe blue
         minorGridPaint.setStrokeWidth(1f);
         minorGridPaint.setStyle(Paint.Style.STROKE);
 
@@ -64,10 +64,10 @@ public class DebugGridView extends View {
         textBgPaint.setColor(0xCC101116);
         textBgPaint.setStyle(Paint.Style.FILL);
 
-        modalPaint.setColor(0x1AFF5252); // Faint red modal fill
+        modalPaint.setColor(0x1ADC2626); // Faint red modal fill
         modalPaint.setStyle(Paint.Style.FILL);
 
-        modalStrokePaint.setColor(0x66FF5252);
+        modalStrokePaint.setColor(0x66DC2626);
         modalStrokePaint.setStrokeWidth(2f);
         modalStrokePaint.setStyle(Paint.Style.STROKE);
         modalStrokePaint.setPathEffect(new DashPathEffect(new float[]{8f, 4f}, 0));
@@ -94,13 +94,13 @@ public class DebugGridView extends View {
         int h = getHeight();
         if (w <= 0 || h <= 0) return;
 
-        // 1. Draw coordinate grid lines every 100px
-        for (int x = 0; x <= w; x += 100) {
-            Paint p = (x % 500 == 0) ? majorGridPaint : minorGridPaint;
+        // 1. Draw coordinate grid lines every 60px
+        for (int x = 0; x <= w; x += 60) {
+            Paint p = (x % 300 == 0 || x == 960) ? majorGridPaint : minorGridPaint;
             canvas.drawLine(x, 0, x, h, p);
         }
-        for (int y = 0; y <= h; y += 100) {
-            Paint p = (y % 500 == 0) ? majorGridPaint : minorGridPaint;
+        for (int y = 0; y <= h; y += 60) {
+            Paint p = (y % 300 == 0 || y == 540) ? majorGridPaint : minorGridPaint;
             canvas.drawLine(0, y, w, y, p);
         }
 
@@ -129,8 +129,8 @@ public class DebugGridView extends View {
 
             String coordStr = "X: " + (int) cursorX + "  Y: " + (int) cursorY;
             float textW = textPaint.measureText(coordStr);
-            float tagX = (cursorX + 32 + textW > w) ? (cursorX - textW - 20) : (cursorX + 28);
-            float tagY = (cursorY - 28 < 30) ? (cursorY + 36) : (cursorY - 14);
+            float tagX = (cursorX + 38 + textW > w) ? (cursorX - textW - 24) : (cursorX + 36);
+            float tagY = (cursorY - 32 < 30) ? (cursorY + 44) : (cursorY - 18);
 
             canvas.drawRect(tagX - 6, tagY - 20, tagX + textW + 6, tagY + 6, textBgPaint);
             canvas.drawText(coordStr, tagX, tagY, textPaint);

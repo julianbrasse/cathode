@@ -2,22 +2,22 @@
 <selector xmlns:android="http://schemas.android.com/apk/res/android">
     <item android:state_focused="true">
         <shape android:shape="oval">
-            <size android:width="44dp" android:height="44dp" />
-            <solid android:color="#2563EB" />
-            <stroke android:width="2.5dp" android:color="#FFFFFF" />
+            <size android:width="40dp" android:height="40dp" />
+            <solid android:color="@color/accent" />
+            <stroke android:width="2.5dp" android:color="@color/white" />
         </shape>
     </item>
     <item android:state_pressed="true">
         <shape android:shape="oval">
-            <size android:width="44dp" android:height="44dp" />
-            <solid android:color="#1D4ED8" />
+            <size android:width="40dp" android:height="40dp" />
+            <solid android:color="@color/accent_pressed" />
         </shape>
     </item>
     <item>
         <shape android:shape="oval">
-            <size android:width="44dp" android:height="44dp" />
-            <solid android:color="#22232B" />
-            <stroke android:width="1dp" android:color="#353644" />
+            <size android:width="40dp" android:height="40dp" />
+            <solid android:color="@color/btn_bg" />
+            <stroke android:width="1dp" android:color="@color/btn_border" />
         </shape>
     </item>
 </selector>
