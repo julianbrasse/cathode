@@ -256,6 +256,7 @@
             android:paddingBottom="28dp">
 
             <TextView
+                android:id="@+id/text_bookmark_dialog_title"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="Edit Bookmark"

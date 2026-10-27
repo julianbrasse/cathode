@@ -13,7 +13,7 @@ An ultra-lean, bloat-free web browser built specifically for Android TV and Goog
 - **History Navigation**: Pressing `BACK` while on the navigation bar seamlessly navigates back in browser history (`webView.goBack()`).
 - **One-Touch Bar Dismissal**: Pressing D-Pad `UP` or `DOWN` on the navigation bar exits directly back to web browsing.
 - **Intelligent Modal & Popup Edge Scrolling**: When the cursor enters any floating popup, modal dialog, dropdown menu, or iframe (such as Google's 9-dot app drawer, cookie consent sheets, or nested containers), edge scrolling dynamically binds to the boundaries of that modal. Pushing against the top or bottom of the modal smoothly scrolls the container content without requiring the cursor to travel to the distant TV screen edges.
-- **Two-Stage Scroll Detent & Unified Glass Reticles**: Reaching any scrollable edge keeps the standard circular reticle intact. The cursor only morphs into the directional scroll reticle (`▲` / `▼`) on the first extra push in that direction, featuring matching 3dp drop shadows and glass ring styling that ensures crisp readability over white, black, or colorful backgrounds.
+- **Two-Stage Scroll Detent & Unified Glass Reticles**: Reaching any scrollable edge keeps the standard circular reticle intact. The cursor only morphs into the directional scroll reticle (UP / DOWN) on the first extra push in that direction, featuring matching 3dp drop shadows and glass ring styling that ensures crisp readability over white, black, or colorful backgrounds.
 - **Fluid 60fps Smooth Scrolling**: Chromium GPU-composited smooth scrolling (`behavior: 'smooth'`) for pages and containers, paired with targeted touch gestures for isolated cross-origin iframes.
 - **Material Blue Page Progress**: Clean Electric Blue (`#2979FF`) loading bar at the top of the screen instead of OEM default yellow.
 - **Three-Layer Universal Scrolling**:
@@ -22,28 +22,32 @@ An ultra-lean, bloat-free web browser built specifically for Android TV and Goog
   - **Layer 3 (Universal DOM)**: Deep multi-container scroll covering `window` and any scrollable container with overflow.
 - **Dedicated App Exit Flow**: A clear Exit button `[->]` on the far left of the bottom bar with an Android TV confirmation dialog (`[Cancel]` / `[Exit]`) to prevent accidental quits.
 - **Direct D-Pad Tabbing**: Full focusable support for TV remotes with high-contrast outlines (2.5dp pure white border on the URL input when focused).
-- **Instant Search with Clear Button**: One-click `[ ✕ ]` button embedded directly in the search bar to clear input or start a new search.
+- **Instant Search with Clear Button**: One-click `[ X ]` button embedded directly in the search bar to clear input or start a new search.
 - **Color Remote Shortcuts**:
-  - 🔴 **Red**: Toggle Bookmarks Drawer
-  - 🟢 **Green**: Reload Page
-  - 🔵 **Blue**: Quick Search Mode
-  - 📋 **Menu / Window**: Toggle Navigation Bar
+  - **Red**: Toggle Bookmarks Drawer
+  - **Yellow**: Add / Save Current Page to Bookmarks
+  - **Green**: Reload Page
+  - **Blue**: Quick Search Mode
+  - **Menu / Window**: Toggle Navigation Bar / Edit Focused Bookmark
+- **Bookmark Management**: Long-press OK on any bookmark chip (or press Menu/Window) to edit title, URL, or delete. Focused directly upon opening drawer.
 
 ---
 
 ## Remote Control Guide
 
-| Remote Key | Context: Web Browsing | Context: Navigation Bar |
+| Remote Key | Context: Web Browsing | Context: Navigation Bar / Bookmarks |
 | :--- | :--- | :--- |
-| **D-Pad Directional Keys** | Moves virtual cursor across page | Tabs focus between navigation buttons |
-| **D-Pad Center (OK)** | Simulates left-click at cursor position | Activates focused button / opens URL |
+| **D-Pad Directional Keys** | Moves virtual cursor across page | Tabs focus between navigation buttons and bookmarks |
+| **D-Pad Center (OK)** | Simulates left-click at cursor position | Activates focused button / opens URL / opens bookmark |
+| **D-Pad Center (Long-Press)** | None | On bookmark chip: opens Edit Bookmark dialog |
 | **D-Pad Up / Down** | Edge scroll (when cursor is at screen edge) | Exits navigation bar back to web content |
-| **BACK** | Opens bottom navigation bar | Navigates back in browser history |
+| **BACK** | Opens bottom navigation bar | Navigates back in browser history / closes dialog |
 | **Ch+ / Ch- / PgUp / PgDn** | Scrolls page up / down | Scrolls page up / down |
 | **Red Button** | Toggles Bookmarks Drawer | Toggles Bookmarks Drawer |
+| **Yellow Button** | Opens Add Bookmark dialog for current page | Opens Add Bookmark dialog for current page |
 | **Green Button** | Reloads current page | Reloads current page |
 | **Blue Button** | Focuses search bar at top | Focuses search bar at top |
-| **Exit Button (on bar)** | — | Opens confirmation modal to exit |
+| **Exit Button (on bar)** | - | Opens confirmation modal to exit |
 
 ---
 

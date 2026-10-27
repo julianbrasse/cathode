@@ -9,6 +9,7 @@ import android.content.res.ColorStateList;
 import android.graphics.Color;
 import android.graphics.Rect;
 import android.graphics.RectF;
+import android.graphics.Typeface;
 import android.net.Uri;
 import android.net.http.SslError;
 import android.os.Bundle;
@@ -73,13 +74,13 @@ public class MainActivity extends Activity {
 
     // Bookmark Manage Dialog
     private FrameLayout bookmarkDialogContainer;
+    private TextView textBookmarkDialogTitle;
     private EditText editBookmarkTitle;
     private EditText editBookmarkUrl;
     private Button btnBookmarkDelete;
     private Button btnBookmarkCancel;
     private Button btnBookmarkSave;
     private int editingBookmarkIndex = -1;
-    private boolean isBookmarkManageMode = false;
 
     private int currentCursorResId = R.drawable.cursor_pointer;
     private int edgeScrollTicks = 0;
@@ -187,6 +188,7 @@ public class MainActivity extends Activity {
         btnExitCancel = findViewById(R.id.btn_exit_cancel);
 
         bookmarkDialogContainer = findViewById(R.id.bookmark_dialog_container);
+        textBookmarkDialogTitle = findViewById(R.id.text_bookmark_dialog_title);
         editBookmarkTitle = findViewById(R.id.edit_bookmark_title);
         editBookmarkUrl = findViewById(R.id.edit_bookmark_url);
         btnBookmarkDelete = findViewById(R.id.btn_bookmark_delete);
@@ -428,7 +430,7 @@ public class MainActivity extends Activity {
             public boolean onRenderProcessGone(WebView view, RenderProcessGoneDetail detail) {
                 boolean didCrash = detail.didCrash();
                 android.util.Log.e("CathodeBrowser", "Chromium render process terminated. Did crash: " + didCrash);
-                showHudToast(didCrash ? "Page crashed — reloading" : "Memory freed — reloading");
+                showHudToast(didCrash ? "Page crashed - reloading" : "Memory freed - reloading");
                 handler.post(new Runnable() {
                     @Override
                     public void run() {
@@ -489,8 +491,17 @@ public class MainActivity extends Activity {
         }
     }
 
-    private void showBookmarkDialog(int index, String title, String url) {
+    private void showBookmarkDialog(final int index, String title, String url) {
         editingBookmarkIndex = index;
+        if (textBookmarkDialogTitle != null) {
+            textBookmarkDialogTitle.setText(index < 0 ? "Add Bookmark" : "Edit Bookmark");
+        }
+        if (btnBookmarkDelete != null) {
+            btnBookmarkDelete.setVisibility(index < 0 ? View.GONE : View.VISIBLE);
+        }
+        if (btnBookmarkSave != null) {
+            btnBookmarkSave.setText(index < 0 ? "Add" : "Save");
+        }
         if (editBookmarkTitle != null) editBookmarkTitle.setText(title);
         if (editBookmarkUrl != null) editBookmarkUrl.setText(url);
         if (bookmarkDialogContainer != null) {
@@ -500,7 +511,11 @@ public class MainActivity extends Activity {
             handler.postDelayed(new Runnable() {
                 @Override
                 public void run() {
-                    if (editBookmarkTitle != null) editBookmarkTitle.requestFocus();
+                    if (index < 0) {
+                        if (btnBookmarkSave != null) btnBookmarkSave.requestFocus();
+                    } else {
+                        if (editBookmarkTitle != null) editBookmarkTitle.requestFocus();
+                    }
                 }
             }, 100);
         }
@@ -516,9 +531,7 @@ public class MainActivity extends Activity {
             virtualCursor.setVisibility(View.VISIBLE);
             webView.requestFocus();
         } else if (bookmarksPanel != null && bookmarksPanel.getVisibility() == View.VISIBLE) {
-            if (bookmarksRow1.getChildCount() > 0) {
-                bookmarksRow1.getChildAt(0).requestFocus();
-            }
+            focusBookmarksDrawer();
         }
     }
 
@@ -546,12 +559,8 @@ public class MainActivity extends Activity {
     }
 
     private void saveEditedBookmark() {
-        if (editingBookmarkIndex < 0) {
-            hideBookmarkDialog();
-            return;
-        }
-        String newTitle = editBookmarkTitle.getText().toString().trim();
-        String newUrl = editBookmarkUrl.getText().toString().trim();
+        String newTitle = editBookmarkTitle != null ? editBookmarkTitle.getText().toString().trim() : "";
+        String newUrl = editBookmarkUrl != null ? editBookmarkUrl.getText().toString().trim() : "";
         if (newTitle.isEmpty()) newTitle = newUrl;
         if (newUrl.isEmpty()) {
             hideBookmarkDialog();
@@ -560,14 +569,18 @@ public class MainActivity extends Activity {
         try {
             String jsonStr = prefs.getString(PREF_BOOKMARKS, "[]");
             JSONArray arr = new JSONArray(jsonStr);
-            if (editingBookmarkIndex < arr.length()) {
+            if (editingBookmarkIndex >= 0 && editingBookmarkIndex < arr.length()) {
                 JSONObject obj = arr.getJSONObject(editingBookmarkIndex);
                 obj.put("title", newTitle);
                 obj.put("url", newUrl);
                 prefs.edit().putString(PREF_BOOKMARKS, arr.toString()).apply();
                 showHudToast("Bookmark updated");
-                refreshBookmarksUI();
+            } else {
+                addBookmarkJson(arr, newTitle, newUrl);
+                prefs.edit().putString(PREF_BOOKMARKS, arr.toString()).apply();
+                showHudToast("Bookmark saved");
             }
+            refreshBookmarksUI();
         } catch (Exception e) {
             e.printStackTrace();
         }
@@ -841,7 +854,11 @@ public class MainActivity extends Activity {
         btnBookmarks.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                openBookmarksDrawer();
+                if (bookmarksPanel != null && bookmarksPanel.getVisibility() == View.VISIBLE) {
+                    closeBookmarksDrawer();
+                } else {
+                    openBookmarksDrawer();
+                }
             }
         });
 
@@ -857,6 +874,8 @@ public class MainActivity extends Activity {
                         if (bookmarksPanel != null && bookmarksPanel.getVisibility() == View.VISIBLE) {
                             if (bookmarksRow2.getChildCount() > 0) {
                                 bookmarksRow2.getChildAt(0).requestFocus();
+                            } else if (bookmarksRow1.getChildCount() > 1) {
+                                bookmarksRow1.getChildAt(1).requestFocus();
                             } else if (bookmarksRow1.getChildCount() > 0) {
                                 bookmarksRow1.getChildAt(0).requestFocus();
                             }
@@ -1216,18 +1235,32 @@ public class MainActivity extends Activity {
         bookmarksPanel.bringToFront();
         showBottomBar();
 
+        focusBookmarksDrawer();
         handler.postDelayed(new Runnable() {
             @Override
             public void run() {
-                if (bookmarksRow1.getChildCount() > 0) {
-                    bookmarksRow1.getChildAt(0).requestFocus();
-                }
+                focusBookmarksDrawer();
             }
         }, 50);
+        handler.postDelayed(new Runnable() {
+            @Override
+            public void run() {
+                focusBookmarksDrawer();
+            }
+        }, 150);
+    }
+
+    private void focusBookmarksDrawer() {
+        if (bookmarksPanel != null && bookmarksPanel.getVisibility() == View.VISIBLE) {
+            if (bookmarksRow1 != null && bookmarksRow1.getChildCount() > 1) {
+                bookmarksRow1.getChildAt(1).requestFocus();
+            } else if (bookmarksRow1 != null && bookmarksRow1.getChildCount() > 0) {
+                bookmarksRow1.getChildAt(0).requestFocus();
+            }
+        }
     }
 
     private void closeBookmarksDrawer() {
-        isBookmarkManageMode = false;
         bookmarksPanel.setVisibility(View.GONE);
         if (isNavBarMode) {
             btnBookmarks.requestFocus();
@@ -1263,15 +1296,18 @@ public class MainActivity extends Activity {
         bookmarksRow1.removeAllViews();
         bookmarksRow2.removeAllViews();
 
-        // 1. First button in Row 1: "+ Save Current Page"
+        // 1. First button in Row 1: bolded "Add" with yellow circle indicator
         final Button btnAdd = new Button(this);
-        btnAdd.setText("+ Save Current Page");
+        btnAdd.setText("Add");
         btnAdd.setTextColor(Color.WHITE);
         btnAdd.setTextSize(13f);
+        btnAdd.setTypeface(null, Typeface.BOLD);
         btnAdd.setGravity(Gravity.CENTER);
         btnAdd.setIncludeFontPadding(false);
         btnAdd.setBackgroundResource(R.drawable.btn_pill_selector);
         btnAdd.setFocusable(true);
+        btnAdd.setCompoundDrawablesWithIntrinsicBounds(R.drawable.dot_yellow, 0, 0, 0);
+        btnAdd.setCompoundDrawablePadding(dpToPx(8));
         LinearLayout.LayoutParams lpAdd = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, dpToPx(40));
         lpAdd.setMarginEnd(dpToPx(8));
         btnAdd.setLayoutParams(lpAdd);
@@ -1282,72 +1318,13 @@ public class MainActivity extends Activity {
                 saveCurrentPageBookmark();
             }
         });
-
-        // 2. Second button in Row 1: "✎ Edit" / "✓ Done"
-        final Button btnManage = new Button(this);
-        btnManage.setText(isBookmarkManageMode ? "✓ Done" : "✎ Edit");
-        btnManage.setTextColor(isBookmarkManageMode ? Color.parseColor("#2979FF") : Color.WHITE);
-        btnManage.setTextSize(13f);
-        btnManage.setGravity(Gravity.CENTER);
-        btnManage.setIncludeFontPadding(false);
-        btnManage.setBackgroundResource(R.drawable.btn_pill_selector);
-        btnManage.setFocusable(true);
-        LinearLayout.LayoutParams lpManage = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, dpToPx(40));
-        lpManage.setMarginEnd(dpToPx(8));
-        btnManage.setLayoutParams(lpManage);
-        btnManage.setPadding(dpToPx(16), 0, dpToPx(16), 0);
-        btnManage.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                isBookmarkManageMode = !isBookmarkManageMode;
-                refreshBookmarksUI();
-                if (bookmarksRow1.getChildCount() > 1) {
-                    bookmarksRow1.getChildAt(1).requestFocus();
-                }
-            }
-        });
-
         btnAdd.setOnKeyListener(new View.OnKeyListener() {
             @Override
             public boolean onKey(View v, int keyCode, KeyEvent event) {
                 if (event.getAction() == KeyEvent.ACTION_DOWN) {
                     if (keyCode == KeyEvent.KEYCODE_DPAD_RIGHT) {
-                        btnManage.requestFocus();
-                        return true;
-                    }
-                    if (keyCode == KeyEvent.KEYCODE_DPAD_UP) {
-                        closeBookmarksDrawer();
-                        exitNavBarMode();
-                        return true;
-                    }
-                    if (keyCode == KeyEvent.KEYCODE_DPAD_DOWN) {
-                        if (bookmarksRow2.getChildCount() > 0) {
-                            bookmarksRow2.getChildAt(0).requestFocus();
-                        } else {
-                            btnBookmarks.requestFocus();
-                        }
-                        return true;
-                    }
-                    if (keyCode == KeyEvent.KEYCODE_BACK) {
-                        closeBookmarksDrawer();
-                        return true;
-                    }
-                }
-                return false;
-            }
-        });
-
-        btnManage.setOnKeyListener(new View.OnKeyListener() {
-            @Override
-            public boolean onKey(View v, int keyCode, KeyEvent event) {
-                if (event.getAction() == KeyEvent.ACTION_DOWN) {
-                    if (keyCode == KeyEvent.KEYCODE_DPAD_LEFT) {
-                        btnAdd.requestFocus();
-                        return true;
-                    }
-                    if (keyCode == KeyEvent.KEYCODE_DPAD_RIGHT) {
-                        if (bookmarksRow1.getChildCount() > 2) {
-                            bookmarksRow1.getChildAt(2).requestFocus();
+                        if (bookmarksRow1.getChildCount() > 1) {
+                            bookmarksRow1.getChildAt(1).requestFocus();
                             return true;
                         }
                     }
@@ -1372,11 +1349,9 @@ public class MainActivity extends Activity {
                 return false;
             }
         });
-
         bookmarksRow1.addView(btnAdd);
-        bookmarksRow1.addView(btnManage);
 
-        // 3. Distribute bookmarks evenly across Row 1 and Row 2
+        // 2. Distribute bookmarks evenly across Row 1 and Row 2
         try {
             String jsonStr = prefs.getString(PREF_BOOKMARKS, "[]");
             JSONArray arr = new JSONArray(jsonStr);
@@ -1390,7 +1365,7 @@ public class MainActivity extends Activity {
                 final int bookmarkIndex = i;
 
                 Button chip = new Button(this);
-                chip.setText(isBookmarkManageMode ? ("✎ " + title) : title);
+                chip.setText(title);
                 chip.setTextColor(Color.WHITE);
                 chip.setTextSize(13f);
                 chip.setGravity(Gravity.CENTER);
@@ -1406,13 +1381,9 @@ public class MainActivity extends Activity {
                 chip.setOnClickListener(new View.OnClickListener() {
                     @Override
                     public void onClick(View v) {
-                        if (isBookmarkManageMode) {
-                            showBookmarkDialog(bookmarkIndex, title, url);
-                        } else {
-                            closeBookmarksDrawer();
-                            exitNavBarMode();
-                            loadUrl(url);
-                        }
+                        closeBookmarksDrawer();
+                        exitNavBarMode();
+                        loadUrl(url);
                     }
                 });
 
@@ -1427,8 +1398,28 @@ public class MainActivity extends Activity {
                 final int r1Idx = i; // 0, 1, ...
                 final int r2Idx = i - half; // 0, 1, ...
                 chip.setOnKeyListener(new View.OnKeyListener() {
+                    private long centerDownTime = 0;
+                    private boolean longPressFired = false;
+
                     @Override
                     public boolean onKey(View v, int keyCode, KeyEvent event) {
+                        if (keyCode == KeyEvent.KEYCODE_DPAD_CENTER || keyCode == KeyEvent.KEYCODE_ENTER) {
+                            if (event.getAction() == KeyEvent.ACTION_DOWN) {
+                                if (event.getRepeatCount() == 0) {
+                                    centerDownTime = SystemClock.uptimeMillis();
+                                    longPressFired = false;
+                                } else if (!longPressFired && (event.getRepeatCount() >= 4 || SystemClock.uptimeMillis() - centerDownTime >= 450)) {
+                                    longPressFired = true;
+                                    showBookmarkDialog(bookmarkIndex, title, url);
+                                    return true;
+                                }
+                            } else if (event.getAction() == KeyEvent.ACTION_UP) {
+                                if (longPressFired) {
+                                    longPressFired = false;
+                                    return true;
+                                }
+                            }
+                        }
                         if (event.getAction() == KeyEvent.ACTION_DOWN) {
                             if (keyCode == KeyEvent.KEYCODE_MENU || keyCode == KeyEvent.KEYCODE_WINDOW) {
                                 showBookmarkDialog(bookmarkIndex, title, url);
@@ -1436,7 +1427,7 @@ public class MainActivity extends Activity {
                             }
                             if (keyCode == KeyEvent.KEYCODE_DPAD_LEFT) {
                                 if (inRow1 && r1Idx == 0) {
-                                    btnManage.requestFocus();
+                                    btnAdd.requestFocus();
                                     return true;
                                 }
                             }
@@ -1445,7 +1436,7 @@ public class MainActivity extends Activity {
                                     closeBookmarksDrawer();
                                     exitNavBarMode();
                                 } else {
-                                    int target = Math.min(2 + r2Idx, bookmarksRow1.getChildCount() - 1);
+                                    int target = Math.min(1 + r2Idx, bookmarksRow1.getChildCount() - 1);
                                     if (target >= 0) bookmarksRow1.getChildAt(target).requestFocus();
                                 }
                                 return true;
@@ -1480,21 +1471,11 @@ public class MainActivity extends Activity {
     }
 
     private void saveCurrentPageBookmark() {
-        String currentUrl = webView.getUrl();
-        String currentTitle = webView.getTitle();
-        if (currentUrl == null || currentUrl.isEmpty()) return;
-        if (currentTitle == null || currentTitle.isEmpty()) currentTitle = currentUrl;
-
-        try {
-            String jsonStr = prefs.getString(PREF_BOOKMARKS, "[]");
-            JSONArray arr = new JSONArray(jsonStr);
-            addBookmarkJson(arr, currentTitle, currentUrl);
-            prefs.edit().putString(PREF_BOOKMARKS, arr.toString()).apply();
-            showHudToast("Saved to Bookmarks");
-            refreshBookmarksUI();
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
+        String currentUrl = (webView != null && webView.getUrl() != null) ? webView.getUrl() : "";
+        String currentTitle = (webView != null && webView.getTitle() != null) ? webView.getTitle() : "";
+        if (currentUrl.isEmpty()) currentUrl = "https://";
+        if (currentTitle.isEmpty()) currentTitle = currentUrl;
+        showBookmarkDialog(-1, currentTitle, currentUrl);
     }
 
     @Override
@@ -1553,6 +1534,10 @@ public class MainActivity extends Activity {
             if (keyCode == KeyEvent.KEYCODE_PROG_GREEN) {
                 webView.reload();
                 showHudToast("Reloading page...");
+                return true;
+            }
+            if (keyCode == KeyEvent.KEYCODE_PROG_YELLOW) {
+                saveCurrentPageBookmark();
                 return true;
             }
             if (keyCode == KeyEvent.KEYCODE_PROG_BLUE) {
