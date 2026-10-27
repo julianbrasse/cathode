@@ -226,6 +226,12 @@ public class MainActivity extends Activity {
 
         webView.setWebChromeClient(new WebChromeClient() {
             @Override
+            public boolean onConsoleMessage(android.webkit.ConsoleMessage cm) {
+                android.util.Log.d("CathodeConsole", cm.message());
+                return true;
+            }
+
+            @Override
             public void onProgressChanged(WebView view, int newProgress) {
                 pageProgress.setProgress(newProgress);
                 if (newProgress == 100) {
@@ -694,7 +700,9 @@ public class MainActivity extends Activity {
             @Override
             public void onReceiveValue(String value) {
                 if (value == null || value.equals("null") || value.equals("\"\"") || value.isEmpty()) {
-                    activeModalRect = null;
+                    if (activeModalRect != null && !activeModalRect.contains(x, y)) {
+                        activeModalRect = null;
+                    }
                     return;
                 }
                 try {
@@ -709,7 +717,9 @@ public class MainActivity extends Activity {
                     float right = (float) obj.getDouble("right");
                     activeModalRect = new RectF(left, top, right, bottom);
                 } catch (Exception e) {
-                    activeModalRect = null;
+                    if (activeModalRect != null && !activeModalRect.contains(x, y)) {
+                        activeModalRect = null;
+                    }
                 }
             }
         });
@@ -719,29 +729,29 @@ public class MainActivity extends Activity {
         long now = SystemClock.uptimeMillis();
         boolean insideModal = (activeModalRect != null && activeModalRect.contains(cursorX, cursorY));
 
-        // Layer 1: Hardware-accelerated mouse wheel generic motion event (1 discrete tick)
-        try {
-            MotionEvent.PointerProperties[] props = new MotionEvent.PointerProperties[1];
-            props[0] = new MotionEvent.PointerProperties();
-            props[0].id = 0;
-            props[0].toolType = MotionEvent.TOOL_TYPE_MOUSE;
-
-            MotionEvent.PointerCoords[] coords = new MotionEvent.PointerCoords[1];
-            coords[0] = new MotionEvent.PointerCoords();
-            coords[0].x = cursorX;
-            coords[0].y = cursorY;
-            coords[0].setAxisValue(MotionEvent.AXIS_VSCROLL, dy < 0 ? 1.0f : -1.0f);
-
-            MotionEvent scrollEvent = MotionEvent.obtain(
-                now, now, MotionEvent.ACTION_SCROLL, 1, props, coords, 0, 0, 1.0f, 1.0f, 0, 0,
-                InputDevice.SOURCE_MOUSE, 0
-            );
-            webView.dispatchGenericMotionEvent(scrollEvent);
-            scrollEvent.recycle();
-        } catch (Exception ignored) {}
-
-        // Layer 2: Targeted non-flinging touch drag ONLY when inside an iframe / modal popup
         if (insideModal) {
+            // Hardware mouse wheel + smooth touch drag routed specifically to the modal iframe
+            try {
+                MotionEvent.PointerProperties[] props = new MotionEvent.PointerProperties[1];
+                props[0] = new MotionEvent.PointerProperties();
+                props[0].id = 0;
+                props[0].toolType = MotionEvent.TOOL_TYPE_MOUSE;
+
+                MotionEvent.PointerCoords[] coords = new MotionEvent.PointerCoords[1];
+                coords[0] = new MotionEvent.PointerCoords();
+                coords[0].x = cursorX;
+                coords[0].y = cursorY;
+                coords[0].setAxisValue(MotionEvent.AXIS_VSCROLL, dy > 0 ? -1.0f : 1.0f);
+
+                MotionEvent scrollEvent = MotionEvent.obtain(
+                    now, now, MotionEvent.ACTION_SCROLL, 1, props, coords,
+                    0, 0, 1.0f, 1.0f, 0, 0,
+                    InputDevice.SOURCE_MOUSE, 0
+                );
+                webView.dispatchGenericMotionEvent(scrollEvent);
+                scrollEvent.recycle();
+            } catch (Exception ignored) {}
+
             try {
                 float fromX = cursorX;
                 float fromY = cursorY;
@@ -756,24 +766,30 @@ public class MainActivity extends Activity {
                 move.recycle();
                 cancel.recycle();
             } catch (Exception ignored) {}
+        } else {
+            // Smooth, hardware-composited 60fps DOM scroll for main page and in-page scrollable containers
+            String js = "(function() {" +
+                "  var dy = " + dy + ";" +
+                "  var cx = " + cursorX + " / (window.devicePixelRatio || 1);" +
+                "  var cy = " + cursorY + " / (window.devicePixelRatio || 1);" +
+                "  var el = document.elementFromPoint(cx, cy);" +
+                "  var target = null;" +
+                "  while (el && el !== document.body && el !== document.documentElement) {" +
+                "    var s = window.getComputedStyle(el);" +
+                "    var oy = s.overflowY || s.overflow;" +
+                "    if ((oy === 'scroll' || oy === 'auto') && (el.scrollHeight > el.clientHeight + 10)) {" +
+                "      target = el; break;" +
+                "    }" +
+                "    el = el.parentElement;" +
+                "  }" +
+                "  if (target) {" +
+                "    target.scrollBy({top: dy, behavior: 'smooth'});" +
+                "  } else {" +
+                "    window.scrollBy({top: dy, behavior: 'smooth'});" +
+                "  }" +
+                "})();";
+            webView.evaluateJavascript(js, null);
         }
-
-        // Layer 3: Universal DOM scroll covering window and any scrollable container/modal/dialog with overflow
-        String js = "(function() {" +
-            "  var dy = " + dy + ";" +
-            (insideModal ? "" : "  window.scrollBy({top: dy, behavior: 'instant'});") +
-            "  var all = document.querySelectorAll('div, main, section, dialog, article, aside');" +
-            "  for (var i = 0; i < all.length; i++) {" +
-            "    var el = all[i];" +
-            "    if (el.scrollHeight > el.clientHeight + 20 && el.clientHeight > 150) {" +
-            "      var s = window.getComputedStyle(el);" +
-            "      if (s.overflowY === 'scroll' || s.overflowY === 'auto' || s.overflow === 'scroll' || s.overflow === 'auto') {" +
-            "        el.scrollTop += dy;" +
-            "      }" +
-            "    }" +
-            "  }" +
-            "})();";
-        webView.evaluateJavascript(js, null);
     }
 
     private void showBottomBar() {
@@ -1147,7 +1163,9 @@ public class MainActivity extends Activity {
                 if (activeModalRect != null && activeModalRect.contains(cursorX, cursorY)) {
                     insideModal = true;
                     effectiveMinY = Math.max(minY, activeModalRect.top + dpToPx(8));
-                    effectiveMaxY = Math.min(maxY, activeModalRect.bottom - dpToPx(8));
+                    float modalBottom = (activeModalRect.bottom >= screenHeight - dpToPx(80)) ?
+                        (screenHeight - dpToPx(72)) : (activeModalRect.bottom - dpToPx(16));
+                    effectiveMaxY = Math.min(maxY, modalBottom);
                 } else {
                     insideModal = false;
                     effectiveMinY = minY;
@@ -1163,7 +1181,7 @@ public class MainActivity extends Activity {
                                 updateCursorIcon(R.drawable.cursor_scroll_up);
                             } else if (edgeScrollTicks >= 2) {
                                 updateCursorIcon(R.drawable.cursor_scroll_up);
-                                scrollWeb(-75);
+                                scrollWeb(insideModal ? -85 : -110);
                             }
                             if (insideModal && edgeScrollTicks >= 5) {
                                 activeModalRect = null;
@@ -1186,7 +1204,7 @@ public class MainActivity extends Activity {
                                 updateCursorIcon(R.drawable.cursor_scroll_down);
                             } else if (edgeScrollTicks >= 2) {
                                 updateCursorIcon(R.drawable.cursor_scroll_down);
-                                scrollWeb(75);
+                                scrollWeb(insideModal ? 85 : 110);
                             }
                             if (insideModal && edgeScrollTicks >= 5) {
                                 activeModalRect = null;

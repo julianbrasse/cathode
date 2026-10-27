@@ -13,7 +13,8 @@ An ultra-lean, bloat-free web browser built specifically for Android TV and Goog
 - **History Navigation**: Pressing `BACK` while on the navigation bar seamlessly navigates back in browser history (`webView.goBack()`).
 - **One-Touch Bar Dismissal**: Pressing D-Pad `UP` or `DOWN` on the navigation bar exits directly back to web browsing.
 - **Intelligent Modal & Popup Edge Scrolling**: When the cursor enters any floating popup, modal dialog, dropdown menu, or iframe (such as Google's 9-dot app drawer, cookie consent sheets, or nested containers), edge scrolling dynamically binds to the boundaries of that modal. Pushing against the top or bottom of the modal smoothly scrolls the container content without requiring the cursor to travel to the distant TV screen edges.
-- **Two-Stage Scroll Detent**: Reaching any scrollable edge keeps the standard circular reticle intact. The cursor only morphs into the directional scroll reticle (`▲` / `▼`) on the first extra push in that direction, and initiates controlled 75px scrolling on subsequent clicks or hold.
+- **Two-Stage Scroll Detent & Unified Glass Reticles**: Reaching any scrollable edge keeps the standard circular reticle intact. The cursor only morphs into the directional scroll reticle (`▲` / `▼`) on the first extra push in that direction, featuring matching 3dp drop shadows and glass ring styling that ensures crisp readability over white, black, or colorful backgrounds.
+- **Fluid 60fps Smooth Scrolling**: Chromium GPU-composited smooth scrolling (`behavior: 'smooth'`) for pages and containers, paired with targeted touch gestures for isolated cross-origin iframes.
 - **Material Blue Page Progress**: Clean Electric Blue (`#2979FF`) loading bar at the top of the screen instead of OEM default yellow.
 - **Three-Layer Universal Scrolling**:
   - **Layer 1 (Native Generic Motion)**: Hardware mouse-wheel `ACTION_SCROLL` events (`AXIS_VSCROLL`) routed directly to the element under the cursor.
