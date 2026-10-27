@@ -64,6 +64,9 @@ public class MainActivity extends Activity {
     private int currentCursorResId = R.drawable.cursor_pointer;
     private int edgeScrollTicks = 0;
     private RectF activeModalRect = null;
+    private boolean containerCanScrollUp = true;
+    private boolean containerCanScrollDown = true;
+    private boolean isInsideIframe = false;
     private long lastModalCheckTime = 0;
 
     private float cursorX = 960f;
@@ -677,18 +680,21 @@ public class MainActivity extends Activity {
             "  var dpr = window.devicePixelRatio || 1;" +
             "  var el = document.elementFromPoint(cx / dpr, cy / dpr);" +
             "  while (el && el !== document.body && el !== document.documentElement) {" +
+            "    var isTextarea = (el.tagName === 'TEXTAREA');" +
+            "    var isIframe = (el.tagName === 'IFRAME');" +
             "    var s = window.getComputedStyle(el);" +
             "    var oy = s.overflowY || s.overflow;" +
-            "    var isScrollable = (oy === 'scroll' || oy === 'auto') && (el.scrollHeight > el.clientHeight + 10);" +
-            "    var isIframe = (el.tagName === 'IFRAME');" +
-            "    if (isScrollable || isIframe) {" +
+            "    var isScrollable = (oy === 'scroll' || oy === 'auto') && (el.scrollHeight > el.clientHeight + 4);" +
+            "    if (isTextarea || isIframe || isScrollable) {" +
             "      var r = el.getBoundingClientRect();" +
             "      var top = r.top * dpr;" +
             "      var bottom = r.bottom * dpr;" +
             "      var left = r.left * dpr;" +
             "      var right = r.right * dpr;" +
-            "      if (r.height * dpr < (window.innerHeight * dpr - 30) || r.width * dpr < (window.innerWidth * dpr - 30)) {" +
-            "        return JSON.stringify({top: top, bottom: bottom, left: left, right: right});" +
+            "      var canUp = isIframe ? true : (el.scrollTop > 2);" +
+            "      var canDown = isIframe ? true : (el.scrollTop + el.clientHeight < el.scrollHeight - 4);" +
+            "      if (r.height * dpr < (window.innerHeight * dpr - 20) || r.width * dpr < (window.innerWidth * dpr - 20)) {" +
+            "        return JSON.stringify({top: top, bottom: bottom, left: left, right: right, canUp: canUp, canDown: canDown, isIframe: isIframe});" +
             "      }" +
             "    }" +
             "    el = el.parentElement;" +
@@ -702,6 +708,9 @@ public class MainActivity extends Activity {
                 if (value == null || value.equals("null") || value.equals("\"\"") || value.isEmpty()) {
                     if (activeModalRect != null && !activeModalRect.contains(x, y)) {
                         activeModalRect = null;
+                        containerCanScrollUp = true;
+                        containerCanScrollDown = true;
+                        isInsideIframe = false;
                     }
                     return;
                 }
@@ -716,9 +725,15 @@ public class MainActivity extends Activity {
                     float left = (float) obj.getDouble("left");
                     float right = (float) obj.getDouble("right");
                     activeModalRect = new RectF(left, top, right, bottom);
+                    containerCanScrollUp = obj.optBoolean("canUp", true);
+                    containerCanScrollDown = obj.optBoolean("canDown", true);
+                    isInsideIframe = obj.optBoolean("isIframe", false);
                 } catch (Exception e) {
                     if (activeModalRect != null && !activeModalRect.contains(x, y)) {
                         activeModalRect = null;
+                        containerCanScrollUp = true;
+                        containerCanScrollDown = true;
+                        isInsideIframe = false;
                     }
                 }
             }
@@ -729,67 +744,99 @@ public class MainActivity extends Activity {
         long now = SystemClock.uptimeMillis();
         boolean insideModal = (activeModalRect != null && activeModalRect.contains(cursorX, cursorY));
 
-        if (insideModal) {
-            // Hardware mouse wheel + smooth touch drag routed specifically to the modal iframe
-            try {
-                MotionEvent.PointerProperties[] props = new MotionEvent.PointerProperties[1];
-                props[0] = new MotionEvent.PointerProperties();
-                props[0].id = 0;
-                props[0].toolType = MotionEvent.TOOL_TYPE_MOUSE;
+        float targetX = cursorX;
+        float targetY = cursorY;
 
-                MotionEvent.PointerCoords[] coords = new MotionEvent.PointerCoords[1];
-                coords[0] = new MotionEvent.PointerCoords();
-                coords[0].x = cursorX;
-                coords[0].y = cursorY;
-                coords[0].setAxisValue(MotionEvent.AXIS_VSCROLL, dy > 0 ? -1.0f : 1.0f);
-
-                MotionEvent scrollEvent = MotionEvent.obtain(
-                    now, now, MotionEvent.ACTION_SCROLL, 1, props, coords,
-                    0, 0, 1.0f, 1.0f, 0, 0,
-                    InputDevice.SOURCE_MOUSE, 0
-                );
-                webView.dispatchGenericMotionEvent(scrollEvent);
-                scrollEvent.recycle();
-            } catch (Exception ignored) {}
-
-            try {
-                float fromX = cursorX;
-                float fromY = cursorY;
-                float toY = fromY - dy;
-                MotionEvent down = MotionEvent.obtain(now, now, MotionEvent.ACTION_DOWN, fromX, fromY, 0);
-                MotionEvent move = MotionEvent.obtain(now, now + 35, MotionEvent.ACTION_MOVE, fromX, toY, 0);
-                MotionEvent cancel = MotionEvent.obtain(now, now + 70, MotionEvent.ACTION_CANCEL, fromX, toY, 0);
-                webView.dispatchTouchEvent(down);
-                webView.dispatchTouchEvent(move);
-                webView.dispatchTouchEvent(cancel);
-                down.recycle();
-                move.recycle();
-                cancel.recycle();
-            } catch (Exception ignored) {}
-        } else {
-            // Smooth, hardware-composited 60fps DOM scroll for main page and in-page scrollable containers
-            String js = "(function() {" +
-                "  var dy = " + dy + ";" +
-                "  var cx = " + cursorX + " / (window.devicePixelRatio || 1);" +
-                "  var cy = " + cursorY + " / (window.devicePixelRatio || 1);" +
-                "  var el = document.elementFromPoint(cx, cy);" +
-                "  var target = null;" +
-                "  while (el && el !== document.body && el !== document.documentElement) {" +
-                "    var s = window.getComputedStyle(el);" +
-                "    var oy = s.overflowY || s.overflow;" +
-                "    if ((oy === 'scroll' || oy === 'auto') && (el.scrollHeight > el.clientHeight + 10)) {" +
-                "      target = el; break;" +
-                "    }" +
-                "    el = el.parentElement;" +
-                "  }" +
-                "  if (target) {" +
-                "    target.scrollBy({top: dy, behavior: 'smooth'});" +
-                "  } else {" +
-                "    window.scrollBy({top: dy, behavior: 'smooth'});" +
-                "  }" +
-                "})();";
-            webView.evaluateJavascript(js, null);
+        if (insideModal && activeModalRect != null) {
+            targetX = activeModalRect.centerX();
+            float safeTop = Math.max(activeModalRect.top, dpToPx(40));
+            float safeBottom = (activeModalRect.bottom >= screenHeight - dpToPx(80)) ?
+                    (screenHeight - dpToPx(72)) : activeModalRect.bottom;
+            targetY = (safeTop + safeBottom) / 2f;
         }
+
+        // 1. Hardware mouse-wheel generic motion event
+        try {
+            MotionEvent.PointerProperties[] props = new MotionEvent.PointerProperties[1];
+            props[0] = new MotionEvent.PointerProperties();
+            props[0].id = 0;
+            props[0].toolType = MotionEvent.TOOL_TYPE_MOUSE;
+
+            MotionEvent.PointerCoords[] coords = new MotionEvent.PointerCoords[1];
+            coords[0] = new MotionEvent.PointerCoords();
+            coords[0].x = targetX;
+            coords[0].y = targetY;
+            coords[0].setAxisValue(MotionEvent.AXIS_VSCROLL, dy > 0 ? -1.0f : 1.0f);
+
+            MotionEvent scrollEvent = MotionEvent.obtain(
+                now, now, MotionEvent.ACTION_SCROLL, 1, props, coords,
+                0, 0, 1.0f, 1.0f, 0, 0,
+                InputDevice.SOURCE_MOUSE, 0
+            );
+            webView.dispatchGenericMotionEvent(scrollEvent);
+            scrollEvent.recycle();
+        } catch (Exception ignored) {}
+
+        // 2. Localized touch flick (dispatches full gesture sequence to native Blink/Chromium compositor)
+        try {
+            float startX = targetX;
+            float startY, endY;
+            float dragDistance = Math.min(dpToPx(160), Math.max(dpToPx(80), Math.abs(dy) * 1.5f));
+
+            if (insideModal && activeModalRect != null) {
+                float safeTop = Math.max(activeModalRect.top, dpToPx(40));
+                float safeBottom = (activeModalRect.bottom >= screenHeight - dpToPx(80)) ?
+                        (screenHeight - dpToPx(72)) : activeModalRect.bottom;
+                float centerY = (safeTop + safeBottom) / 2f;
+
+                if (dy > 0) {
+                    // Scrolling DOWN: content moves up, touch drags UP
+                    startY = Math.min(safeBottom - dpToPx(20), centerY + dragDistance / 2f);
+                    endY = startY - dragDistance;
+                } else {
+                    // Scrolling UP: content moves down, touch drags DOWN
+                    startY = Math.max(safeTop + dpToPx(20), centerY - dragDistance / 2f);
+                    endY = startY + dragDistance;
+                }
+            } else {
+                startY = cursorY;
+                endY = (dy > 0) ? (startY - dragDistance) : (startY + dragDistance);
+            }
+
+            long downTime = now;
+            webView.dispatchTouchEvent(MotionEvent.obtain(downTime, downTime, MotionEvent.ACTION_DOWN, startX, startY, 0));
+            webView.dispatchTouchEvent(MotionEvent.obtain(downTime, downTime + 20, MotionEvent.ACTION_MOVE, startX, startY + (endY - startY) * 0.33f, 0));
+            webView.dispatchTouchEvent(MotionEvent.obtain(downTime, downTime + 40, MotionEvent.ACTION_MOVE, startX, startY + (endY - startY) * 0.66f, 0));
+            webView.dispatchTouchEvent(MotionEvent.obtain(downTime, downTime + 60, MotionEvent.ACTION_MOVE, startX, endY, 0));
+            webView.dispatchTouchEvent(MotionEvent.obtain(downTime, downTime + 80, MotionEvent.ACTION_UP, startX, endY, 0));
+        } catch (Exception ignored) {}
+
+        // 3. Targeted DOM scroll covering textareas, modal containers, and root window
+        String js = "(function(cx, cy, dy) {" +
+            "  var dpr = window.devicePixelRatio || 1;" +
+            "  var el = document.elementFromPoint(cx / dpr, cy / dpr);" +
+            "  var target = null;" +
+            "  while (el && el !== document.body && el !== document.documentElement) {" +
+            "    var isTextarea = (el.tagName === 'TEXTAREA');" +
+            "    var s = window.getComputedStyle(el);" +
+            "    var oy = s.overflowY || s.overflow;" +
+            "    if (isTextarea || ((oy === 'scroll' || oy === 'auto') && el.scrollHeight > el.clientHeight + 4)) {" +
+            "      target = el; break;" +
+            "    }" +
+            "    el = el.parentElement;" +
+            "  }" +
+            "  if (target) {" +
+            "    target.scrollTop += dy;" +
+            "    if (target.scrollBy) target.scrollBy({top: dy, behavior: 'smooth'});" +
+            "  } else {" +
+            "    window.scrollBy({top: dy, behavior: 'smooth'});" +
+            "  }" +
+            "})(" + targetX + ", " + targetY + ", " + dy + ");";
+        webView.evaluateJavascript(js, null);
+
+        // Immediate check to update container scroll limits
+        lastModalCheckTime = 0;
+        checkActiveModal(cursorX, cursorY);
     }
 
     private void showBottomBar() {
@@ -1162,9 +1209,9 @@ public class MainActivity extends Activity {
 
                 if (activeModalRect != null && activeModalRect.contains(cursorX, cursorY)) {
                     insideModal = true;
-                    effectiveMinY = Math.max(minY, activeModalRect.top + dpToPx(8));
+                    effectiveMinY = Math.max(minY, activeModalRect.top + dpToPx(6));
                     float modalBottom = (activeModalRect.bottom >= screenHeight - dpToPx(80)) ?
-                        (screenHeight - dpToPx(72)) : (activeModalRect.bottom - dpToPx(16));
+                            (screenHeight - dpToPx(72)) : (activeModalRect.bottom - dpToPx(8));
                     effectiveMaxY = Math.min(maxY, modalBottom);
                 } else {
                     insideModal = false;
@@ -1175,18 +1222,24 @@ public class MainActivity extends Activity {
                 switch (keyCode) {
                     case KeyEvent.KEYCODE_DPAD_UP:
                         if (cursorY <= effectiveMinY + 4f) {
-                            edgeScrollTicks++;
-                            if (edgeScrollTicks == 1) {
-                                // Only switch to scroll icon after the first extra UP scroll
-                                updateCursorIcon(R.drawable.cursor_scroll_up);
-                            } else if (edgeScrollTicks >= 2) {
-                                updateCursorIcon(R.drawable.cursor_scroll_up);
-                                scrollWeb(insideModal ? -85 : -110);
-                            }
-                            if (insideModal && edgeScrollTicks >= 5) {
+                            boolean canExit = (insideModal && isInsideIframe && edgeScrollTicks >= 20) ||
+                                              (insideModal && !isInsideIframe && !containerCanScrollUp && edgeScrollTicks >= 2);
+                            if (canExit) {
+                                // End of scrolling reached at top of modal: allow cursor to exit modal
                                 activeModalRect = null;
+                                isInsideIframe = false;
                                 cursorY = Math.max(minY, cursorY - step);
                                 updateCursorIcon(R.drawable.cursor_pointer);
+                                edgeScrollTicks = 0;
+                            } else {
+                                edgeScrollTicks++;
+                                if (edgeScrollTicks == 1) {
+                                    // Only switch to scroll icon after the first extra UP scroll
+                                    updateCursorIcon(R.drawable.cursor_scroll_up);
+                                } else if (edgeScrollTicks >= 2) {
+                                    updateCursorIcon(R.drawable.cursor_scroll_up);
+                                    scrollWeb(insideModal ? -75 : -100);
+                                }
                             }
                         } else {
                             edgeScrollTicks = 0;
@@ -1198,18 +1251,24 @@ public class MainActivity extends Activity {
 
                     case KeyEvent.KEYCODE_DPAD_DOWN:
                         if (cursorY >= effectiveMaxY - 4f) {
-                            edgeScrollTicks++;
-                            if (edgeScrollTicks == 1) {
-                                // Only switch to scroll icon after the first extra DOWN scroll
-                                updateCursorIcon(R.drawable.cursor_scroll_down);
-                            } else if (edgeScrollTicks >= 2) {
-                                updateCursorIcon(R.drawable.cursor_scroll_down);
-                                scrollWeb(insideModal ? 85 : 110);
-                            }
-                            if (insideModal && edgeScrollTicks >= 5) {
+                            boolean canExit = (insideModal && isInsideIframe && edgeScrollTicks >= 20) ||
+                                              (insideModal && !isInsideIframe && !containerCanScrollDown && edgeScrollTicks >= 2);
+                            if (canExit) {
+                                // End of scrolling reached at bottom of modal: allow cursor to exit modal
                                 activeModalRect = null;
+                                isInsideIframe = false;
                                 cursorY = Math.min(maxY, cursorY + step);
                                 updateCursorIcon(R.drawable.cursor_pointer);
+                                edgeScrollTicks = 0;
+                            } else {
+                                edgeScrollTicks++;
+                                if (edgeScrollTicks == 1) {
+                                    // Only switch to scroll icon after the first extra DOWN scroll
+                                    updateCursorIcon(R.drawable.cursor_scroll_down);
+                                } else if (edgeScrollTicks >= 2) {
+                                    updateCursorIcon(R.drawable.cursor_scroll_down);
+                                    scrollWeb(insideModal ? 75 : 100);
+                                }
                             }
                         } else {
                             edgeScrollTicks = 0;
@@ -1224,6 +1283,7 @@ public class MainActivity extends Activity {
                         cursorX = Math.max(minX, cursorX - step);
                         if (insideModal && activeModalRect != null && cursorX < activeModalRect.left) {
                             activeModalRect = null;
+                            isInsideIframe = false;
                         }
                         updateCursorIcon(R.drawable.cursor_pointer);
                         break;
@@ -1233,6 +1293,7 @@ public class MainActivity extends Activity {
                         cursorX = Math.min(maxX, cursorX + step);
                         if (insideModal && activeModalRect != null && cursorX > activeModalRect.right) {
                             activeModalRect = null;
+                            isInsideIframe = false;
                         }
                         updateCursorIcon(R.drawable.cursor_pointer);
                         break;
