@@ -13,10 +13,9 @@ import android.view.View;
  * Renders the 60px x 60px virtual cursor grid, coordinate crosshairs,
  * and container bounding boxes perfectly aligned with the browser design system.
  */
-public class DebugGridView extends View {
+public final class DebugGridView extends View {
 
-    private final Paint minorGridPaint = new Paint();
-    private final Paint majorGridPaint = new Paint();
+    private final Paint gridPaint = new Paint();
     private final Paint crosshairPaint = new Paint();
     private final Paint textPaint = new Paint();
     private final Paint textBgPaint = new Paint();
@@ -45,14 +44,11 @@ public class DebugGridView extends View {
         init();
     }
 
+    @SuppressWarnings("this-escape")
     private void init() {
-        minorGridPaint.setColor(0x152979FF); // Subtle electric blue grid
-        minorGridPaint.setStrokeWidth(1f);
-        minorGridPaint.setStyle(Paint.Style.STROKE);
-
-        majorGridPaint.setColor(0x352979FF); // Major grid lines every 300px
-        majorGridPaint.setStrokeWidth(1.5f);
-        majorGridPaint.setStyle(Paint.Style.STROKE);
+        gridPaint.setColor(0x1A2979FF); // Uniform subtle electric blue grid
+        gridPaint.setStrokeWidth(1f);
+        gridPaint.setStyle(Paint.Style.STROKE);
 
         crosshairPaint.setColor(0x802979FF); // Electric blue dashed cursor projection
         crosshairPaint.setStrokeWidth(1.5f);
@@ -102,29 +98,22 @@ public class DebugGridView extends View {
         int h = getHeight();
         if (w <= 0 || h <= 0) return;
 
-        // 1. Draw coordinate grid lines every 60px
+        // 1. Draw coordinate grid lines every 60px (uniform width and color)
         for (int x = 0; x <= w; x += 60) {
-            Paint p = (x % 300 == 0 || x == 960) ? majorGridPaint : minorGridPaint;
-            canvas.drawLine(x, 0, x, h, p);
+            canvas.drawLine(x, 0, x, h, gridPaint);
         }
         for (int y = 0; y <= h; y += 60) {
-            Paint p = (y % 300 == 0 || y == 540) ? majorGridPaint : minorGridPaint;
-            canvas.drawLine(0, y, w, y, p);
+            canvas.drawLine(0, y, w, y, gridPaint);
         }
 
-        // 2. Corner and center coordinate badges (rounded with glass border)
-        drawBadge(canvas, 10f, 10f, "0, 0");
-        drawBadge(canvas, w / 2f - 46f, h / 2f - 24f, (w / 2) + ", " + (h / 2));
-        drawBadge(canvas, w - 104f, h - 34f, w + ", " + h);
-
-        // 3. Highlight active modal bounding box if present
+        // 2. Highlight active modal bounding box if present
         if (activeModalRect != null) {
             canvas.drawRect(activeModalRect, modalPaint);
             canvas.drawRect(activeModalRect, modalStrokePaint);
             drawBadge(canvas, activeModalRect.left + 4f, activeModalRect.top - 26f, "CONTAINER BOUNDS");
         }
 
-        // 4. Draw cursor crosshairs and coordinate readout
+        // 3. Draw cursor crosshairs and coordinate readout
         if (cursorX >= 0 && cursorY >= 0) {
             canvas.drawLine(0, cursorY, w, cursorY, crosshairPaint);
             canvas.drawLine(cursorX, 0, cursorX, h, crosshairPaint);

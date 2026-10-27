@@ -4,10 +4,13 @@
     android:height="14dp"
     android:viewportWidth="14"
     android:viewportHeight="14">
-    <!-- Subtle drop shadow for contrast on pure white sites -->
+    <!-- Centered contrast halo (zero offset, blurred border effect) -->
     <path
-        android:fillColor="#99000000"
-        android:pathData="M 6.3,3.3 L 9.3,3.3 L 9.3,8.3 L 12.3,8.3 L 7.8,12.8 L 3.3,8.3 L 6.3,8.3 Z" />
+        android:fillColor="#66000000"
+        android:strokeColor="#99000000"
+        android:strokeWidth="1.6"
+        android:strokeLineJoin="round"
+        android:pathData="M 5.5,2.5 L 8.5,2.5 L 8.5,7.5 L 11.5,7.5 L 7,12 L 2.5,7.5 L 5.5,7.5 Z" />
     <!-- Crisp white down arrow -->
     <path
         android:fillColor="#FFFFFFFF"

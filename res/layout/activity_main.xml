@@ -253,7 +253,7 @@
     <!-- Performance & Diagnostics Debug HUD Panel (Snapped to 60px Grid) -->
     <LinearLayout
         android:id="@+id/debug_hud_panel"
-        android:layout_width="300dp"
+        android:layout_width="320dp"
         android:layout_height="wrap_content"
         android:layout_gravity="top|end"
         android:layout_marginTop="30dp"
@@ -261,9 +261,13 @@
         android:background="@drawable/debug_card_background"
         android:elevation="150dp"
         android:orientation="vertical"
-        android:padding="16dp"
+        android:paddingStart="16dp"
+        android:paddingTop="14dp"
+        android:paddingEnd="16dp"
+        android:paddingBottom="14dp"
         android:visibility="gone">
 
+        <!-- Header: Title & FPS Badge -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -287,67 +291,112 @@
                 android:background="@drawable/badge_fps_bg"
                 android:paddingStart="8dp"
                 android:paddingEnd="8dp"
-                android:paddingTop="3dp"
-                android:paddingBottom="3dp"
+                android:paddingTop="2dp"
+                android:paddingBottom="2dp"
                 android:text="60 FPS"
                 android:textColor="@color/status_success"
-                android:textSize="12sp"
+                android:textSize="11sp"
                 android:textStyle="bold" />
         </LinearLayout>
 
         <View
             android:layout_width="match_parent"
             android:layout_height="1dp"
-            android:layout_marginTop="10dp"
-            android:layout_marginBottom="10dp"
+            android:layout_marginTop="8dp"
+            android:layout_marginBottom="8dp"
             android:background="@color/divider_subtle" />
+
+        <!-- Section 1: SYSTEM & NETWORK -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="SYSTEM &amp; NETWORK"
+            android:textColor="@color/scrollbar_blue"
+            android:textSize="9sp"
+            android:textStyle="bold"
+            android:letterSpacing="0.06" />
+
+        <TextView
+            android:id="@+id/debug_text_memory"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="2dp"
+            android:text="RAM: 4 MB | Load: 450 ms"
+            android:textColor="@color/text_primary"
+            android:textSize="11sp"
+            android:fontFamily="monospace" />
 
         <TextView
             android:id="@+id/debug_text_network"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="NET: Checking..."
-            android:textColor="@color/text_primary"
-            android:textSize="12sp"
+            android:layout_marginTop="2dp"
+            android:text="NET: Wi-Fi (1048 Mbps)"
+            android:textColor="@color/text_secondary"
+            android:textSize="11sp"
             android:fontFamily="monospace" />
+
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="1dp"
+            android:layout_marginTop="8dp"
+            android:layout_marginBottom="8dp"
+            android:background="@color/divider_subtle" />
+
+        <!-- Section 2: VIEWPORT & DOCUMENT -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="VIEWPORT &amp; DOCUMENT"
+            android:textColor="@color/scrollbar_blue"
+            android:textSize="9sp"
+            android:textStyle="bold"
+            android:letterSpacing="0.06" />
 
         <TextView
             android:id="@+id/debug_text_viewport"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="8dp"
-            android:text="VIEW: 960x540 | Screen: 1920x1080"
+            android:layout_marginTop="2dp"
+            android:text="VIEW: 960x540 | Screen: 1920x1080 (320dpi)"
             android:textColor="@color/text_primary"
-            android:textSize="12sp"
+            android:textSize="11sp"
             android:fontFamily="monospace" />
 
         <TextView
             android:id="@+id/debug_text_doc"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="8dp"
-            android:text="DOC: 960x1080 | Scroll: (0, 0)"
-            android:textColor="@color/text_primary"
-            android:textSize="12sp"
+            android:layout_marginTop="2dp"
+            android:text="DOC: 960x1080 | Scroll: (0, 0) | Zoom: 1.0"
+            android:textColor="@color/text_secondary"
+            android:textSize="11sp"
             android:fontFamily="monospace" />
+
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="1dp"
+            android:layout_marginTop="8dp"
+            android:layout_marginBottom="8dp"
+            android:background="@color/divider_subtle" />
+
+        <!-- Section 3: NAVIGATION & CURSOR -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="NAVIGATION &amp; CURSOR"
+            android:textColor="@color/scrollbar_blue"
+            android:textSize="9sp"
+            android:textStyle="bold"
+            android:letterSpacing="0.06" />
 
         <TextView
             android:id="@+id/debug_text_cursor"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="8dp"
-            android:text="CURSOR: (960, 540) | Step: 20"
+            android:layout_marginTop="2dp"
+            android:text="CURSOR: (960, 540) | Mode: Content | Step: 20px"
             android:textColor="@color/text_primary"
-            android:textSize="12sp"
-            android:fontFamily="monospace" />
-
-        <TextView
-            android:id="@+id/debug_text_memory"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="8dp"
-            android:text="RAM: 34 MB | Load: 450 ms"
-            android:textColor="@color/text_muted"
             android:textSize="11sp"
             android:fontFamily="monospace" />
     </LinearLayout>

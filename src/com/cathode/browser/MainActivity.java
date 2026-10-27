@@ -127,6 +127,7 @@ public class MainActivity extends Activity {
     private float cursorY = 540f;
     private int screenWidth = 1920;
     private int screenHeight = 1080;
+    private int screenDpi = 320;
 
     private boolean isBarVisible = false;
     private boolean isSearchingAtTop = false;
@@ -150,6 +151,7 @@ public class MainActivity extends Activity {
         DisplayMetrics dm = getResources().getDisplayMetrics();
         screenWidth = dm.widthPixels > 0 ? dm.widthPixels : 1920;
         screenHeight = dm.heightPixels > 0 ? dm.heightPixels : 1080;
+        screenDpi = dm.densityDpi > 0 ? dm.densityDpi : 320;
         cursorX = screenWidth / 2f;
         cursorY = screenHeight / 2f;
 
@@ -392,6 +394,15 @@ public class MainActivity extends Activity {
             }
 
             @Override
+            public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) {
+                if (request != null && request.getUrl() != null) {
+                    return shouldOverrideUrlLoading(view, request.getUrl().toString());
+                }
+                return false;
+            }
+
+            @Override
+            @SuppressWarnings("deprecation")
             public boolean shouldOverrideUrlLoading(WebView view, String url) {
                 if (url == null) return false;
                 if (url.startsWith("intent:") || url.startsWith("market:") || url.startsWith("tel:") || url.startsWith("mailto:")) {
@@ -405,14 +416,6 @@ public class MainActivity extends Activity {
                         showHudToast("Cannot open external app");
                     }
                     return true;
-                }
-                return false;
-            }
-
-            @Override
-            public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) {
-                if (request != null && request.getUrl() != null) {
-                    return shouldOverrideUrlLoading(view, request.getUrl().toString());
                 }
                 return false;
             }
@@ -513,7 +516,9 @@ public class MainActivity extends Activity {
             "    var sw = Math.max(document.documentElement.scrollWidth || 0, document.body ? document.body.scrollWidth : 0);" +
             "    if (sw > screenCssW + 4) {" +
             "      var factor = screenCssW / sw;" +
-            "      factor = Math.max(0.65, Math.min(1.0, factor));" +
+            "      factor = Math.round(factor / 0.05) * 0.05;" +
+            "      factor = Math.max(0.70, Math.min(1.0, factor));" +
+            "      factor = Math.round(factor * 100) / 100;" +
             "      document.documentElement.style.zoom = '' + factor;" +
             "    } else {" +
             "      document.documentElement.style.zoom = '1.0';" +
@@ -592,22 +597,11 @@ public class MainActivity extends Activity {
             debugTextFps.setText(fpsStr);
             if (currentFps >= 55.0) {
                 debugTextFps.setTextColor(0xFF00E676);
-                debugTextFps.setBackgroundColor(0x2500E676);
             } else if (currentFps >= 30.0) {
                 debugTextFps.setTextColor(0xFFFFD600);
-                debugTextFps.setBackgroundColor(0x25FFD600);
             } else {
                 debugTextFps.setTextColor(0xFFFF5252);
-                debugTextFps.setBackgroundColor(0x25FF5252);
             }
-        }
-
-        if (debugTextNetwork != null) {
-            debugTextNetwork.setText(getNetworkStats());
-        }
-
-        if (debugTextViewport != null) {
-            debugTextViewport.setText("VIEW: 960x540 | Screen: 1920x1080 (320dpi)");
         }
 
         if (debugTextMemory != null) {
@@ -615,12 +609,20 @@ public class MainActivity extends Activity {
             long freeMem = Runtime.getRuntime().freeMemory() / (1024 * 1024);
             long usedMem = totalMem - freeMem;
             String loadStr = lastPageLoadDurationMs > 0 ? (lastPageLoadDurationMs + " ms") : "--";
-            debugTextMemory.setText("RAM: " + usedMem + " MB used | Load: " + loadStr);
+            debugTextMemory.setText("RAM: " + usedMem + " MB | Load: " + loadStr);
+        }
+
+        if (debugTextNetwork != null) {
+            debugTextNetwork.setText(getNetworkStats());
+        }
+
+        if (debugTextViewport != null) {
+            debugTextViewport.setText("VIEW: 960x540 | Screen: " + screenWidth + "x" + screenHeight + " (" + screenDpi + "dpi)");
         }
 
         if (debugTextCursor != null) {
             String modeStr = isNavBarMode ? "Nav Bar" : (isSearchingAtTop ? "Search" : "Content");
-            debugTextCursor.setText("CURSOR: (" + (int) cursorX + ", " + (int) cursorY + ") | Mode: " + modeStr);
+            debugTextCursor.setText("CURSOR: (" + (int) cursorX + ", " + (int) cursorY + ") | Mode: " + modeStr + " | Step: 20px");
         }
 
         if (debugTextDoc != null && webView != null) {
@@ -841,7 +843,6 @@ public class MainActivity extends Activity {
             String fileName = URLUtil.guessFileName(url, contentDisposition, mimeType);
             request.setTitle(fileName);
             request.setDescription("Downloading file...");
-            request.allowScanningByMediaScanner();
             request.setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED);
             request.setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS, fileName);
 
@@ -1061,6 +1062,12 @@ public class MainActivity extends Activity {
     }
 
     private void updateCursorPosition() {
+        // Enforce strict 20px grid alignment at all times (prevents drift from external events/modals)
+        cursorX = Math.round(cursorX / CURSOR_STEP_PX) * CURSOR_STEP_PX;
+        cursorY = Math.round(cursorY / CURSOR_STEP_PX) * CURSOR_STEP_PX;
+        cursorX = Math.max(CURSOR_MARGIN_EDGE_PX, Math.min((float) screenWidth - CURSOR_MARGIN_EDGE_PX, cursorX));
+        cursorY = Math.max(CURSOR_MARGIN_EDGE_PX, Math.min((float) screenHeight - CURSOR_MARGIN_EDGE_PX, cursorY));
+
         if (virtualCursor != null) {
             virtualCursor.setX(cursorX - CURSOR_HALF_PX);
             virtualCursor.setY(cursorY - CURSOR_HALF_PX);
@@ -1069,7 +1076,7 @@ public class MainActivity extends Activity {
             if (debugGridView != null) debugGridView.setCursorPos(cursorX, cursorY, activeModalRect);
             if (debugTextCursor != null) {
                 String modeStr = isNavBarMode ? "Nav Bar" : (isSearchingAtTop ? "Search" : "Content");
-                debugTextCursor.setText("CURSOR: (" + (int) cursorX + ", " + (int) cursorY + ") | Mode: " + modeStr);
+                debugTextCursor.setText("CURSOR: (" + (int) cursorX + ", " + (int) cursorY + ") | Mode: " + modeStr + " | Step: 20px");
             }
         }
     }
@@ -1155,10 +1162,10 @@ public class MainActivity extends Activity {
             "    var rh = r.height * dpr;" +
             "    var rw = r.width * dpr;" +
             "    if ((isDialog || isTextarea || isIframe || isScrollable) && (rh >= 160 || isDialog)) {" +
-            "      var top = r.top * dpr;" +
-            "      var bottom = r.bottom * dpr;" +
-            "      var left = r.left * dpr;" +
-            "      var right = r.right * dpr;" +
+            "      var top = Math.floor((r.top * dpr) / 20) * 20;" +
+            "      var bottom = Math.ceil((r.bottom * dpr) / 20) * 20;" +
+            "      var left = Math.floor((r.left * dpr) / 20) * 20;" +
+            "      var right = Math.ceil((r.right * dpr) / 20) * 20;" +
             "      var canUp = isIframe ? true : (el.scrollTop > 4);" +
             "      var canDown = isIframe ? true : (el.scrollTop + el.clientHeight < el.scrollHeight - 8);" +
             "      if (rh < (window.innerHeight * dpr - 40) || rw < (window.innerWidth * dpr - 40)) {" +
@@ -1191,10 +1198,10 @@ public class MainActivity extends Activity {
                     JSONObject obj = new JSONObject(clean);
                     boolean isModal = obj.optBoolean("isModal", false);
                     if (isModal) {
-                        float top = (float) obj.getDouble("top");
-                        float bottom = (float) obj.getDouble("bottom");
-                        float left = (float) obj.getDouble("left");
-                        float right = (float) obj.getDouble("right");
+                        float top = Math.round((float) obj.getDouble("top") / 20f) * 20f;
+                        float bottom = Math.round((float) obj.getDouble("bottom") / 20f) * 20f;
+                        float left = Math.round((float) obj.getDouble("left") / 20f) * 20f;
+                        float right = Math.round((float) obj.getDouble("right") / 20f) * 20f;
                         activeModalRect = new RectF(left, top, right, bottom);
                         containerCanScrollUp = obj.optBoolean("canUp", true);
                         containerCanScrollDown = obj.optBoolean("canDown", true);
@@ -1664,7 +1671,9 @@ public class MainActivity extends Activity {
                 keyCode == KeyEvent.KEYCODE_SETTINGS ||
                 keyCode == KeyEvent.KEYCODE_CAPTIONS ||
                 keyCode == KeyEvent.KEYCODE_GUIDE ||
-                keyCode == KeyEvent.KEYCODE_LAST_CHANNEL) {
+                keyCode == KeyEvent.KEYCODE_LAST_CHANNEL ||
+                keyCode == KeyEvent.KEYCODE_F1 ||
+                (!urlEdit.hasFocus() && keyCode == KeyEvent.KEYCODE_D)) {
                 toggleDebugOverlay();
                 return true;
             }
@@ -1812,12 +1821,12 @@ public class MainActivity extends Activity {
 
                 if (activeModalRect != null && activeModalRect.contains(cursorX, cursorY)) {
                     insideModal = true;
-                    effectiveMinX = Math.max(minX, activeModalRect.left + CURSOR_MARGIN_EDGE_PX / 2f);
-                    effectiveMaxX = Math.min(maxX, activeModalRect.right - CURSOR_MARGIN_EDGE_PX / 2f);
-                    effectiveMinY = Math.max(minY, activeModalRect.top + CURSOR_MARGIN_EDGE_PX / 2f);
+                    effectiveMinX = Math.round(Math.max(minX, activeModalRect.left + 20f) / 20f) * 20f;
+                    effectiveMaxX = Math.round(Math.min(maxX, activeModalRect.right - 20f) / 20f) * 20f;
+                    effectiveMinY = Math.round(Math.max(minY, activeModalRect.top + 20f) / 20f) * 20f;
                     float modalBottom = (activeModalRect.bottom >= screenHeight - dpToPx(80)) ?
-                            (screenHeight - dpToPx(72)) : (activeModalRect.bottom - CURSOR_MARGIN_EDGE_PX / 2f);
-                    effectiveMaxY = Math.min(maxY, modalBottom);
+                            (screenHeight - dpToPx(72)) : (activeModalRect.bottom - 20f);
+                    effectiveMaxY = Math.round(Math.min(maxY, modalBottom) / 20f) * 20f;
                 } else {
                     insideModal = false;
                     effectiveMinX = minX;
@@ -1834,7 +1843,7 @@ public class MainActivity extends Activity {
                                 if (canExitModal) {
                                     activeModalRect = null;
                                     isInsideIframe = false;
-                                    cursorY = Math.max(minY, cursorY - step);
+                                    cursorY = Math.round(Math.max(minY, cursorY - step) / 20f) * 20f;
                                     updateCursorIcon(R.drawable.cursor_pointer);
                                     edgeScrollTicks = 0;
                                     break;
@@ -1852,7 +1861,7 @@ public class MainActivity extends Activity {
                             }
                         } else {
                             edgeScrollTicks = 0;
-                            cursorY = Math.max(effectiveMinY, cursorY - step);
+                            cursorY = Math.round(Math.max(effectiveMinY, cursorY - step) / 20f) * 20f;
                             // On normal move to edge, KEEP NORMAL POINTER ICON!
                             updateCursorIcon(R.drawable.cursor_pointer);
                         }
@@ -1865,7 +1874,7 @@ public class MainActivity extends Activity {
                                 if (canExitModal) {
                                     activeModalRect = null;
                                     isInsideIframe = false;
-                                    cursorY = Math.min(maxY, cursorY + step);
+                                    cursorY = Math.round(Math.min(maxY, cursorY + step) / 20f) * 20f;
                                     updateCursorIcon(R.drawable.cursor_pointer);
                                     edgeScrollTicks = 0;
                                     break;
@@ -1883,7 +1892,7 @@ public class MainActivity extends Activity {
                             }
                         } else {
                             edgeScrollTicks = 0;
-                            cursorY = Math.min(effectiveMaxY, cursorY + step);
+                            cursorY = Math.round(Math.min(effectiveMaxY, cursorY + step) / 20f) * 20f;
                             // On normal move to edge, KEEP NORMAL POINTER ICON!
                             updateCursorIcon(R.drawable.cursor_pointer);
                         }
@@ -1896,7 +1905,7 @@ public class MainActivity extends Activity {
                             scrollWeb(hScrollAmount, 0);
                         } else {
                             edgeScrollTicks = 0;
-                            cursorX = Math.max(minX, cursorX - step);
+                            cursorX = Math.round(Math.max(minX, cursorX - step) / 20f) * 20f;
                             updateCursorIcon(R.drawable.cursor_pointer);
                         }
                         break;
@@ -1908,7 +1917,7 @@ public class MainActivity extends Activity {
                             scrollWeb(hScrollAmount, 0);
                         } else {
                             edgeScrollTicks = 0;
-                            cursorX = Math.min(maxX, cursorX + step);
+                            cursorX = Math.round(Math.min(maxX, cursorX + step) / 20f) * 20f;
                             updateCursorIcon(R.drawable.cursor_pointer);
                         }
                         break;
@@ -2105,7 +2114,7 @@ public class MainActivity extends Activity {
     public void onTrimMemory(int level) {
         super.onTrimMemory(level);
         if (level >= TRIM_MEMORY_MODERATE) {
-            if (webView != null) webView.freeMemory();
+            if (webView != null) webView.clearCache(false);
         }
     }
 
